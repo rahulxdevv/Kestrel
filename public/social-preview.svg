@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbfaf7"/>
+      <stop offset="1" stop-color="#f1eee7"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7195e8" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#7195e8" stop-opacity=".02"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="1010" cy="90" r="220" fill="#f4e8dd" opacity=".52"/>
+  <rect x="64" y="58" width="52" height="52" rx="15" fill="#17130f"/>
+  <path d="M82 72v24m2-12 17-13m-17 13 17 13" fill="none" stroke="#f8f6f2" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m88 84 10-8" fill="none" stroke="#dd7045" stroke-width="2.4" stroke-linecap="round"/>
+  <text x="132" y="96" fill="#211e19" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" letter-spacing="-.8">Kestrel</text>
+  <rect x="64" y="174" width="410" height="35" rx="17.5" fill="#e9eee8"/>
+  <circle cx="84" cy="191.5" r="5" fill="#617965"/>
+  <text x="100" y="197" fill="#617965" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" letter-spacing="1.3">SELF-HOSTED WEB ANALYTICS</text>
+  <text x="64" y="286" fill="#211e19" font-family="Arial, Helvetica, sans-serif" font-size="55" font-weight="700" letter-spacing="-2.2">See where your</text>
+  <text x="64" y="353" fill="#211e19" font-family="Arial, Helvetica, sans-serif" font-size="55" font-weight="700" letter-spacing="-2.2">revenue comes from.</text>
+  <text x="66" y="414" fill="#716d66" font-family="Arial, Helvetica, sans-serif" font-size="24">Privacy-friendly analytics. Real payment attribution.</text>
+  <text x="66" y="448" fill="#716d66" font-family="Arial, Helvetica, sans-serif" font-size="24">Your data, on your own server.</text>
+  <rect x="64" y="500" width="178" height="48" rx="10" fill="#211e19"/>
+  <text x="88" y="531" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">One container</text>
+  <rect x="256" y="500" width="161" height="48" rx="10" fill="#fff" stroke="#e3dfd6"/>
+  <text x="280" y="531" fill="#49453f" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">One SQLite file</text>
+  <rect x="625" y="147" width="509" height="350" rx="20" fill="#fff" stroke="#e7e3dc"/>
+  <text x="660" y="190" fill="#827d75" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" letter-spacing="1">REVENUE ATTRIBUTION</text>
+  <text x="660" y="236" fill="#211e19" font-family="Arial, Helvetica, sans-serif" font-size="35" font-weight="700">$24,680</text>
+  <rect x="1014" y="207" width="84" height="27" rx="13.5" fill="#edf4ed"/>
+  <text x="1030" y="226" fill="#557a5d" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700">+18.4%</text>
+  <path d="M660 283H1098M660 337H1098M660 391H1098M660 445H1098" stroke="#eeece7"/>
+  <path d="M660 424 C705 411 718 426 753 392 S812 404 839 363 S892 378 924 339 S972 350 1004 310 S1050 330 1098 274 L1098 445 L660 445Z" fill="url(#line)"/>
+  <path d="M660 424 C705 411 718 426 753 392 S812 404 839 363 S892 378 924 339 S972 350 1004 310 S1050 330 1098 274" fill="none" stroke="#6b8dde" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="1098" cy="274" r="6" fill="#6b8dde" stroke="#fff" stroke-width="3"/>
+  <rect x="660" y="463" width="135" height="20" rx="10" fill="#f4f2ed"/>
+  <circle cx="674" cy="473" r="4" fill="#7597e8"/>
+  <text x="685" y="478" fill="#746f67" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="600">Traffic by channel</text>
+  <rect x="814" y="463" width="130" height="20" rx="10" fill="#f4f2ed"/>
+  <circle cx="828" cy="473" r="4" fill="#df8a62"/>
+  <text x="839" y="478" fill="#746f67" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="600">Payments tracked</text>
+  <text x="925" y="575" fill="#77726b" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="600">kestrel.rahulxdevv.com</text>
+</svg>
