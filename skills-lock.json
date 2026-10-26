@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "skills": {
+    "ui-taste": {
+      "source": "uizze.sh",
+      "sourceUrl": "https://uizze.sh/",
+      "sourceType": "well-known",
+      "computedHash": "b9d9f1f68d2db3316639cf77ad74dae34a2ed2ffb90845e5de6c592095c78a3d",
+      "wellKnownDigest": "sha256:120fd3e899db255454fff61b7e8c22757524ffe31101a22d19346708bd20c4b9"
+    }
+  }
+}

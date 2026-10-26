@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kestrel",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2025-09-01",
+  "observability": { "enabled": true },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // API calls, the landing page and share links need the Worker; everything else is a free static file.
+    "run_worker_first": ["/api/*", "/", "/share/*", "/js/script.js"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "kestrel",
+      // Replace with the id printed by `npx wrangler d1 create kestrel`.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

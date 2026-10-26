@@ -1,0 +1,14 @@
+node_modules
+dist
+build
+data
+.git
+.github
+.wrangler
+.env
+.env.*
+!.env.example
+*.log
+docs
+test
+coverage

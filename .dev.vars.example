@@ -1,0 +1,3 @@
+# Only needed for `npm run dev:cf` (wrangler dev). Copy to .dev.vars.
+ADMIN_PASSWORD=change-me
+SESSION_SECRET=any-long-random-string

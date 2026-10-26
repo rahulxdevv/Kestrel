@@ -1,0 +1,34 @@
+services:
+  kestrel:
+    build: .
+    image: kestrel:latest
+    container_name: kestrel
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env or your dashboard env}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env or your dashboard env}
+      SITE_URL: ${SITE_URL:-}
+      INGEST_RATE_LIMIT: ${INGEST_RATE_LIMIT:-300}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      DATA_DIR: /data
+    volumes:
+      - kestrel-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>r.json()).then(j=>process.exit(j.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+volumes:
+  kestrel-data:

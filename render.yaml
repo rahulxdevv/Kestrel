@@ -1,0 +1,24 @@
+# Render blueprint. Requires a paid instance type: the SQLite database lives on a persistent disk,
+# and free instances don't support disks (data would reset on every deploy).
+services:
+  - type: web
+    name: kestrel
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: oregon
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATA_DIR
+        value: /data
+      - key: SITE_URL
+        sync: false
+    disk:
+      name: kestrel-data
+      mountPath: /data
+      sizeGB: 1

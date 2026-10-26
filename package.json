@@ -1,0 +1,65 @@
+{
+  "name": "kestrel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Kestrel is a lightning-fast, revenue-first web analytics platform you can self-host anywhere. SQLite, one container, no vendor lock-in.",
+  "author": "rahulxdevv",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rahulxdevv/kestrel.git"
+  },
+  "homepage": "https://github.com/rahulxdevv/kestrel",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n api,vite \"npm:dev:node\" \"npm:dev:web\"",
+    "dev:node": "tsx watch src/server/index.ts",
+    "dev:web": "vite",
+    "dev:cf": "wrangler dev --port 8787",
+    "build": "vite build && npm run build:tracker && npm run build:server",
+    "build:tracker": "esbuild public/js/kestrel.js --minify --outfile=dist/js/kestrel.js --log-level=warning",
+    "build:server": "esbuild src/server/index.ts --bundle --platform=node --format=esm --target=node22 --outfile=build/server.mjs --log-level=warning",
+    "start": "node build/server.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "node scripts/migrate.mjs",
+    "db:migrate:cf": "wrangler d1 migrations apply kestrel --remote",
+    "deploy:cloudflare": "vite build && npm run build:tracker && wrangler d1 migrations apply kestrel --remote && wrangler deploy",
+    "seed": "node scripts/seed-demo.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "docker:build": "docker build -t kestrel .",
+    "docker:run": "docker run --rm -p 3000:3000 -v kestrel-data:/data -e ADMIN_PASSWORD=change-me -e SESSION_SECRET=$(openssl rand -hex 32) kestrel"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.6",
+    "hono": "^4.13.13",
+    "maplibre-gl": "^6.16.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261023.1",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^22.20.5",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.6.1",
+    "concurrently": "^10.0.6",
+    "esbuild": "^0.25.12",
+    "jsdom": "^30.1.3",
+    "postcss": "^8.5.31",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.15.4",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.5",
+    "vitest": "^3.2.7",
+    "wrangler": "^4.152.0"
+  }
+}
