@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server';
+import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -81,9 +82,27 @@ function main(): void {
   const hostname = process.env.HOST || '0.0.0.0';
 
   mkdirSync(dirname(dbPath), { recursive: true });
-  const db = openDatabase(dbPath);
+  let db = openDatabase(dbPath);
   const applied = migrate(db, migrationsDir);
   if (applied.length) console.log(`→ Applied ${applied.length} migration(s): ${applied.join(', ')}`);
+
+  const demoMode = process.env.DEMO_MODE?.trim().toLowerCase() === 'true';
+  if (demoMode && !process.argv.includes('--migrate')) {
+    const demoSite = db.raw.prepare('SELECT 1 FROM sites WHERE id = ?').get('kestrel-demo');
+    if (!demoSite) {
+      db.close();
+      console.log('Demo site is missing; seeding the showcase dataset…');
+      const seeded = spawnSync(process.execPath, [resolve('scripts/seed-demo.mjs')], {
+        env: process.env,
+        stdio: 'inherit',
+      });
+      if (seeded.error) throw seeded.error;
+      if (seeded.status !== 0) throw new Error(`Demo seed failed with exit code ${seeded.status ?? 'unknown'}`);
+      db = openDatabase(dbPath);
+      const seededMigrations = migrate(db, migrationsDir);
+      if (seededMigrations.length) console.log(`→ Applied ${seededMigrations.length} migration(s): ${seededMigrations.join(', ')}`);
+    }
+  }
 
   const session = resolveSessionSecret(dataDir);
   const password = process.env.ADMIN_PASSWORD?.trim() || (dev ? resolveDevPassword(dataDir) : undefined);

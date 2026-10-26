@@ -18,7 +18,7 @@ export function Realtime({ siteId, demoMode = false }: { siteId: string; demoMod
 }
 
 function RealtimeBody() {
-  const { apiBase, q, reloadKey, refresh, site } = useDash();
+  const { apiBase, q, reloadKey, refresh, site, demoMode } = useDash();
   const { t } = useT();
   const [auto, setAuto] = useState(true);
   const [view, setView] = useState<'globe' | 'flat'>('globe');
@@ -74,10 +74,10 @@ function RealtimeBody() {
             <button
               className={`btn h-8 py-0 text-[11.5px] ${auto ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : ''}`}
               onClick={() => setAuto((a) => !a)}
-              title="Auto-refresh every 15 seconds"
+              title={demoMode ? 'Rotate sample visitors every 15 seconds' : 'Auto-refresh every 15 seconds'}
             >
               <span className={`h-1.5 w-1.5 rounded-full ${auto ? 'bg-emerald-500' : 'bg-stone-400'}`} />
-              {auto ? 'Live' : 'Paused'}
+              {auto ? (demoMode ? 'Simulated' : 'Live') : 'Paused'}
             </button>
             <button className="btn h-8 w-8 px-0 text-[11.5px]" onClick={refresh} disabled={loading} aria-label="Refresh">
               <Icon name="refresh" size={14} />
@@ -125,11 +125,15 @@ function RealtimeBody() {
 
           <div className="pointer-events-none absolute bottom-3 left-4 right-4 flex items-end justify-between gap-2">
             <span className="rounded-lg bg-black/35 px-2 py-1 text-[10.5px] text-white/50 backdrop-blur">
-              {view === 'globe' ? 'Drag to spin the globe. Every face is a visitor from the last 30 minutes.' : 'Flat map · every dot is a visitor from the last 30 minutes.'}
+              {demoMode
+                ? 'Sample locations are simulated for this demo.'
+                : view === 'globe'
+                  ? 'Drag to spin the globe. Every face is a visitor from the last 30 minutes.'
+                  : 'Flat map · every dot is a visitor from the last 30 minutes.'}
             </span>
             {points.length > 0 && (
               <span className="rounded-lg bg-black/35 px-2 py-1 text-[10.5px] text-white/50 backdrop-blur">
-                {points.length} live {points.length === 1 ? 'location' : 'locations'}
+                {points.length} {demoMode ? 'sample' : 'live'} {points.length === 1 ? 'location' : 'locations'}
               </span>
             )}
           </div>
@@ -203,7 +207,9 @@ function RealtimeBody() {
           }))}
         />
         <p className="px-1 text-[11px] text-stone-400">
-          Counts are distinct visitors in the last 30 minutes. Realtime data is never sampled.
+          {demoMode
+            ? 'These simulated visitors rotate while you explore. No live tracking data is collected.'
+            : 'Counts are distinct visitors in the last 30 minutes. Realtime data is never sampled.'}
         </p>
       </div>
     </div>

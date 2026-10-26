@@ -212,7 +212,7 @@ export function Shell({
 
         {demoMode && (
           <div className="border-b border-amber-200/70 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900 sm:px-6">
-            Demo showcase · sample analytics only · changes and tracking are disabled
+            Demo showcase · sample analytics and simulated live visitors · writes and tracking are disabled
           </div>
         )}
         <main className="mx-auto w-full max-w-[1500px] px-3 pb-16 pt-3 sm:px-5 lg:px-8 lg:pt-6">{children}</main>

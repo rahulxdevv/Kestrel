@@ -33,6 +33,7 @@ const MAX_FAILURES = 10;
 const LOCKOUT_MS = 15 * 60_000;
 const DEMO_SITE_ID = 'kestrel-demo';
 const isDemoMode = (c: Context<AppEnv>) => c.env.DEMO_MODE?.trim().toLowerCase() === 'true';
+const demoOnlineCount = () => 4 + Math.floor(Math.random() * 5);
 
 // API responses are always fresh and never sniffed as something else.
 app.use('/api/*', async (c, next) => {
@@ -213,7 +214,7 @@ app.get('/api/sites', async (c) => {
     (sites.results as unknown as Site[]).map((s) => ({
       ...(demo ? demoSite(s) : publicSite(s)),
       visitors24h: by.get(s.id)?.visitors ?? 0,
-      online: by.get(s.id)?.online ?? 0,
+      online: demo ? demoOnlineCount() : by.get(s.id)?.online ?? 0,
     })),
   );
 });
@@ -229,6 +230,7 @@ app.get('/api/summary', async (c) => {
   const rows = (sites.results as Site[]).map((s) => ({
     ...(demo ? demoSite(s) : publicSite(s)),
     ...(summaries.get(s.id) ?? { visitors: 0, revenue: 0, sales: 0, avgOrder: 0, online: 0, previousVisitors: 0, previousRevenue: 0, series: [] }),
+    ...(demo ? { online: demoOnlineCount() } : {}),
   }));
   const currency = rows.length ? rows[0].currency : 'USD';
   return c.json({
@@ -322,7 +324,10 @@ app.delete('/api/sites/:id', async (c) => {
 
 // ---------- stats
 
-app.get('/api/sites/:id/overview', async (c) => c.json(await overview(makeCtx(c))));
+app.get('/api/sites/:id/overview', async (c) => {
+  const data = await overview(makeCtx(c));
+  return c.json(isDemoMode(c) ? { ...data, online: demoOnlineCount() } : data);
+});
 
 app.get('/api/sites/:id/breakdown', async (c) => {
   try {
@@ -337,7 +342,7 @@ app.get('/api/sites/:id/ai', async (c) => c.json(await aiTraffic(makeCtx(c))));
 app.get('/api/sites/:id/timeseries', async (c) =>
   c.json(await timeseries(makeCtx(c), c.req.query('dim') === 'page' ? 'page' : 'goal', Number(c.req.query('limit')) || 7)),
 );
-app.get('/api/sites/:id/realtime', async (c) => c.json(await realtime(makeCtx(c))));
+app.get('/api/sites/:id/realtime', async (c) => c.json(await realtime(makeCtx(c), isDemoMode(c))));
 app.get('/api/sites/:id/export', handleExport);
 app.post('/api/sites/:id/rematch', async (c) => c.json(await rematchPayments(c.env.DB, c.get('site'))));
 app.get('/api/sites/:id/customers', async (c) => c.json(await customers(makeCtx(c))));

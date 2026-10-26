@@ -229,12 +229,13 @@ delete. Protocol, curl examples and prompts: [docs/MCP.md](docs/MCP.md).
 4. Set `ADMIN_PASSWORD` and `SESSION_SECRET` (and optionally `SITE_URL`).
 5. Point the domain at port `3000`. Health check: `/api/health`.
 
-For a public showcase, set `DEMO_MODE=true` and run `npm run seed` once in the deployed container after
-its first start. This opens the full dashboard with the Kestrel Demo sample and disables every API write,
-including site/funnel changes and incoming tracking/payment events. Visitors can explore Overview, Live,
-Content, Audience, and Goals without logging in; settings, exports, and editing controls are hidden. The
-demo is illustrative and does not collect production analytics. Set `DEMO_MODE=false` to return to the
-password-protected dashboard. Seeded “online now” visitors expire after five minutes.
+For a public showcase, set `DEMO_MODE=true`. On startup, Kestrel seeds the Kestrel Demo dataset if it is
+missing, then opens the full dashboard and disables every API write, including site/funnel changes and
+incoming tracking/payment events. Visitors can explore Overview, Live, Content, Audience, and Goals
+without logging in; settings, exports, and editing controls are hidden. The Live page rotates synthetic
+visitors from the sample data while it is open; this is illustrative and does not collect production
+analytics. Set `DEMO_MODE=false` to return to the password-protected dashboard. Run `npm run seed` manually
+if you want to reset the sample dataset.
 
 ### Render
 

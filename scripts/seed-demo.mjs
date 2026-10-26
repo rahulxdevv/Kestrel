@@ -393,7 +393,11 @@ try {
   console.log(`✓ Seeded ${visitors} visitors, ${payments} payments across 30 days (+${LIVE.length} live visitors).`);
   console.log(`  Site:    Kestrel Demo (${siteId})`);
   console.log(`  Share:   /share/${SHARE}`);
-  console.log(`  Open the dashboard at /app and sign in with your ADMIN_PASSWORD.`);
+  if (process.env.DEMO_MODE?.trim().toLowerCase() === 'true') {
+    console.log('  DEMO_MODE is enabled; the full dashboard is public and read-only.');
+  } else {
+    console.log(`  Open the dashboard at /app and sign in with your ADMIN_PASSWORD.`);
+  }
 } catch (e) {
   try {
     db.exec('ROLLBACK');

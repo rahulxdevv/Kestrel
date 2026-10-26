@@ -441,8 +441,127 @@ export async function visitors(ctx: Ctx) {
  * Last 30 minutes, for the live view. Deliberately unfiltered and tiny: it is polled every 15s,
  * so each call is five small indexed reads rather than the full dashboard query set.
  */
-export async function realtime(ctx: Ctx) {
+interface DemoLiveTemplate {
+  source: string | null;
+  country: string | null;
+  city: string | null;
+  device: string | null;
+  browser: string | null;
+  os: string | null;
+  entry_page: string | null;
+  exit_page: string | null;
+}
+
+/** Synthetic, read-only visitors keep the public demo's Live screen illustrative at any hour. */
+async function demoRealtime(ctx: Ctx, now: number) {
+  const templates = (
+    await ctx.db
+      .prepare(
+        `SELECT source, country, city, device, browser, os, entry_page, exit_page
+         FROM sessions WHERE site_id = ? ORDER BY started_at DESC LIMIT 120`,
+      )
+      .bind(ctx.site.id)
+      .all<DemoLiveTemplate>()
+  ).results;
+  if (!templates.length) return null;
+
+  const activeCount = 4 + Math.floor(Math.random() * 5);
+  const sources = new Map<string | null, number>();
+  const countries = new Map<string | null, number>();
+  const devices = new Map<string | null, number>();
+  const pages = new Map<string, { visitors: Set<string>; views: number }>();
+  const places = new Map<string, { country: string; city: string | null; visitors: number; visitorId: string }>();
+  const activity: {
+    ts: number;
+    type: 'pageview' | 'goal' | 'outbound';
+    name: string | null;
+    path: string;
+    visitor_id: string;
+    source: string | null;
+    country: string | null;
+    city: string | null;
+    device: string | null;
+    browser: string | null;
+    os: string | null;
+  }[] = [];
+
+  for (let i = 0; i < activeCount; i++) {
+    const sample = templates[Math.floor(Math.random() * templates.length)];
+    const visitorId = `demo-live-${now.toString(36)}-${i}-${Math.random().toString(36).slice(2, 7)}`;
+    const source = sample.source;
+    sources.set(source, (sources.get(source) ?? 0) + 1);
+    if (sample.country) countries.set(sample.country, (countries.get(sample.country) ?? 0) + 1);
+    if (sample.device) devices.set(sample.device, (devices.get(sample.device) ?? 0) + 1);
+
+    const placeKey = `${sample.country ?? ''}:${sample.city ?? ''}`;
+    if (sample.country) {
+      const place = places.get(placeKey);
+      if (place) place.visitors++;
+      else places.set(placeKey, { country: sample.country, city: sample.city, visitors: 1, visitorId });
+    }
+
+    const paths = [sample.entry_page, sample.exit_page, '/pricing', '/docs'].filter((p): p is string => Boolean(p));
+    const start = now - Math.floor(Math.random() * 28 * 60_000);
+    const eventCount = 1 + Math.floor(Math.random() * 3);
+    for (let j = 0; j < eventCount; j++) {
+      const path = paths[Math.floor(Math.random() * paths.length)] ?? '/';
+      const roll = Math.random();
+      const type: 'pageview' | 'goal' | 'outbound' = j === 0 || roll < 0.78 ? 'pageview' : roll < 0.93 ? 'goal' : 'outbound';
+      const name = type === 'goal' ? ['signup_click', 'pricing_cta', 'checkout_click'][Math.floor(Math.random() * 3)] :
+        type === 'outbound' ? 'https://x.com/kestrel' : null;
+      const ts = Math.min(now, start + j * (20_000 + Math.floor(Math.random() * 80_000)));
+      activity.push({
+        ts,
+        type,
+        name,
+        path,
+        visitor_id: visitorId,
+        source,
+        country: sample.country,
+        city: sample.city,
+        device: sample.device,
+        browser: sample.browser,
+        os: sample.os,
+      });
+      if (type === 'pageview') {
+        const page = pages.get(path) ?? { visitors: new Set<string>(), views: 0 };
+        page.visitors.add(visitorId);
+        page.views++;
+        pages.set(path, page);
+      }
+    }
+  }
+
+  const points = [...places.values()].flatMap((place) => {
+    const point = geoPoint(place.country, place.city);
+    return point ? [{ ...point, ...place }] : [];
+  });
+  const rows = (counts: Map<string | null, number>) => [...counts.entries()]
+    .map(([label, visitors]) => ({ label, visitors }))
+    .sort((a, b) => b.visitors - a.visitors);
+
+  return {
+    online: activeCount,
+    windowMinutes: 30,
+    pages: [...pages.entries()]
+      .map(([label, counts]) => ({ label, visitors: counts.visitors.size, views: counts.views }))
+      .sort((a, b) => b.visitors - a.visitors)
+      .slice(0, 8),
+    sources: rows(sources).slice(0, 6),
+    countries: rows(countries).slice(0, 6),
+    devices: rows(devices),
+    points,
+    activity: activity.sort((a, b) => b.ts - a.ts).slice(0, 30),
+    serverTime: now,
+  };
+}
+
+export async function realtime(ctx: Ctx, simulate = false) {
   const now = Date.now();
+  if (simulate) {
+    const mock = await demoRealtime(ctx, now);
+    if (mock) return mock;
+  }
   const since = now - 30 * 60_000;
   const active = now - 5 * 60_000;
   const id = ctx.site.id;
