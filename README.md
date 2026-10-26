@@ -16,6 +16,13 @@ Google result next to the money it produced.
 
 ---
 
+## Preview
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/191717cd-2f41-40af-8a78-c1b951b6c959" />
+<img width="1366" height="768" alt="image (1)" src="https://github.com/user-attachments/assets/cc26f401-4636-40af-aeab-059a8209d174" />
+
+
+---
+
 ## What is inside
 
 | Area | What you get |
