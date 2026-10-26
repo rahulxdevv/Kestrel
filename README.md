@@ -229,8 +229,11 @@ delete. Protocol, curl examples and prompts: [docs/MCP.md](docs/MCP.md).
 4. Set `ADMIN_PASSWORD` and `SESSION_SECRET` (and optionally `SITE_URL`).
 5. Point the domain at port `3000`. Health check: `/api/health`.
 
-For a public showcase, set `DEMO_MODE=true`. On startup, Kestrel seeds the Kestrel Demo dataset if it is
-missing, then opens the full dashboard and disables every API write, including site/funnel changes and
+For a public showcase, deploy a separate Kestrel app with its own data volume and set `DEMO_MODE=true`.
+Demo mode rejects all API writes, including incoming analytics events, so do not enable it on the same
+app or database used by real sites. Startup refuses to enable demo mode if its database contains any
+site besides `kestrel-demo`. On startup, Kestrel seeds the Kestrel Demo dataset if it is missing, then
+opens the full dashboard and disables every API write, including site/funnel changes and
 incoming tracking/payment events. Visitors can explore Overview, Live, Content, Audience, and Goals
 without logging in; settings, exports, and editing controls are hidden. The Live page rotates synthetic
 visitors from the sample data while it is open; this is illustrative and does not collect production

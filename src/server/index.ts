@@ -88,6 +88,17 @@ function main(): void {
 
   const demoMode = process.env.DEMO_MODE?.trim().toLowerCase() === 'true';
   if (demoMode && !process.argv.includes('--migrate')) {
+    const otherSite = db.raw.prepare('SELECT id FROM sites WHERE id <> ? LIMIT 1').get('kestrel-demo') as
+      | { id: string }
+      | undefined;
+    if (otherSite) {
+      db.close();
+      throw new Error(
+        `DEMO_MODE requires a dedicated database; found site "${otherSite.id}". ` +
+          'Use a separate Dokploy app and data volume so demo mode cannot interrupt real analytics.',
+      );
+    }
+
     const demoSite = db.raw.prepare('SELECT 1 FROM sites WHERE id = ?').get('kestrel-demo');
     if (!demoSite) {
       db.close();
