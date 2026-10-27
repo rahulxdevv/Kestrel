@@ -156,6 +156,29 @@
   var visibleSince = doc.visibilityState === 'visible' ? Date.now() : 0;
   var pending = 0;
   var engaged = 0;
+  var pageVisibleSince = visibleSince;
+  var pageReading = 0;
+  var maxScroll = 0;
+
+  function currentScroll() {
+    var root = doc.documentElement;
+    var max = Math.max(1, root.scrollHeight - win.innerHeight);
+    maxScroll = Math.max(maxScroll, Math.min(100, Math.round((win.scrollY / max) * 100)));
+  }
+
+  function flushPageEngagement(beacon, pageUrl) {
+    if (pageVisibleSince) {
+      pageReading += Date.now() - pageVisibleSince;
+      pageVisibleSince = doc.visibilityState === 'visible' ? Date.now() : 0;
+    }
+    if (pageReading > 0 || maxScroll > 0) {
+      send('engagement', {
+        rt: Math.min(CONFIG.maxEngagedMs, Math.round(pageReading)),
+        sd: maxScroll,
+        u: pageUrl ? new URL(pageUrl, loc.origin).origin + new URL(pageUrl, loc.origin).pathname : undefined,
+      }, beacon);
+    }
+  }
 
   function flushTime(beacon) {
     if (visibleSince) {
@@ -170,14 +193,24 @@
   }
 
   doc.addEventListener('visibilitychange', function () {
-    if (doc.visibilityState === 'visible') visibleSince = Date.now();
-    else flushTime(true);
+    if (doc.visibilityState === 'visible') {
+      visibleSince = Date.now();
+      pageVisibleSince = Date.now();
+    } else {
+      flushTime(true);
+      flushPageEngagement(true, lastPage);
+    }
   });
   win.addEventListener('pagehide', function () {
     flushTime(true);
+    flushPageEngagement(true, lastPage);
   });
+  win.addEventListener('scroll', currentScroll, { passive: true });
   setInterval(function () {
-    if (doc.visibilityState === 'visible' && engaged < CONFIG.maxEngagedMs) flushTime(false);
+    if (doc.visibilityState === 'visible') {
+      if (engaged < CONFIG.maxEngagedMs) flushTime(false);
+      flushPageEngagement(false, lastPage);
+    }
   }, 30000);
 
   // ---- pageviews (including single-page-app navigation) -------------------
@@ -187,9 +220,16 @@
   function pageview() {
     var page = loc.pathname + loc.search;
     if (page === lastPage) return;
-    if (lastPage !== null) flushTime(false);
+    if (lastPage !== null) {
+      flushTime(false);
+      flushPageEngagement(true, lastPage);
+    }
     lastPage = page;
     engaged = 0;
+    pageReading = 0;
+    maxScroll = 0;
+    pageVisibleSince = doc.visibilityState === 'visible' ? Date.now() : 0;
+    currentScroll();
     send('pageview', { r: firstView ? doc.referrer : '' });
     firstView = false;
   }

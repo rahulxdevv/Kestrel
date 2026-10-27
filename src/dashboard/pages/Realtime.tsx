@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Avatar, DeviceIcon, Favicon, Flag, SourceIcon } from '../components/Icons';
 import { Icon } from '../components/NavIcons';
 import { SiteFrame } from '../components/SiteFrame';
 import { WorldMap } from '../components/WorldMap';
 import { qs, type LiveData } from '../lib/api';
 import { useDash } from '../lib/context';
-import { countryName, fmtNumber } from '../lib/format';
+import { countryName, decimalsFor, fmtMoney, fmtNumber } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { useApi } from '../lib/useApi';
 
@@ -22,13 +22,45 @@ function RealtimeBody() {
   const { t } = useT();
   const [auto, setAuto] = useState(true);
   const [view, setView] = useState<'globe' | 'flat'>('globe');
-  const { data, loading } = useApi<LiveData>(`${apiBase}/realtime?${qs(q)}`, reloadKey);
+  const [sound, setSound] = useState(() => localStorage.getItem('kestrel:sale-sound') === 'on');
+  const seenSales = useRef<Set<string> | null>(null);
+  const latestServerTime = useRef(Date.now());
+  const [saleAfter, setSaleAfter] = useState(() => Date.now() - 1000);
+  const { data, loading } = useApi<LiveData>(`${apiBase}/realtime?${qs(q, { after: saleAfter })}`, reloadKey);
 
   useEffect(() => {
     if (!auto) return;
-    const id = setInterval(refresh, 15_000);
+    const id = setInterval(() => setSaleAfter(Math.max(0, latestServerTime.current - 15_000)), 15_000);
     return () => clearInterval(id);
   }, [auto, refresh]);
+
+  useEffect(() => {
+    const toggle = (event: Event) => setSound(Boolean((event as CustomEvent<{ enabled: boolean }>).detail?.enabled));
+    window.addEventListener('kestrel:sale-sound', toggle);
+    return () => window.removeEventListener('kestrel:sale-sound', toggle);
+  }, []);
+
+  useEffect(() => {
+    if (!data) return;
+    const lastReturnedSale = data.sales[data.sales.length - 1]?.ts;
+    // If the safety cap is reached, keep polling from the oldest unprocessed
+    // point in the ordered result set so a busy site cannot skip sales.
+    const nextCursor = data.sales.length >= 1000 && lastReturnedSale
+      ? Math.max(0, lastReturnedSale - 1)
+      : data.serverTime;
+    latestServerTime.current = Math.max(latestServerTime.current, nextCursor);
+    const ids = data.sales.map((item) => item.sale_id ?? `${item.ts}-${item.visitor_id}`);
+    if (!seenSales.current) seenSales.current = new Set();
+    const unseen = ids.filter((id) => !seenSales.current!.has(id));
+    ids.forEach((id) => seenSales.current!.add(id));
+    if (seenSales.current.size > 1000) seenSales.current = new Set([...seenSales.current].slice(-500));
+    if (sound) unseen.forEach(() => playSaleChime());
+  }, [data, sound]);
+
+  function refreshLive() {
+    setSaleAfter(Math.max(0, latestServerTime.current - 15_000));
+    refresh();
+  }
 
   const time = (ts: number) =>
     new Intl.DateTimeFormat('en', { timeZone: site.timezone, hour: 'numeric', minute: '2-digit' }).format(ts);
@@ -53,7 +85,7 @@ function RealtimeBody() {
               <span className="text-[12.5px] text-stone-500">{t('realtime.liveNow', { domain: site.domain })}</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <div className="flex rounded-xl bg-stone-100/80 p-1" role="group" aria-label="Map style">
               {([
                 { key: 'globe', label: '3D globe' },
@@ -79,9 +111,14 @@ function RealtimeBody() {
               <span className={`h-1.5 w-1.5 rounded-full ${auto ? 'bg-emerald-500' : 'bg-stone-400'}`} />
               {auto ? (demoMode ? 'Simulated' : 'Live') : 'Paused'}
             </button>
-            <button className="btn h-8 w-8 px-0 text-[11.5px]" onClick={refresh} disabled={loading} aria-label="Refresh">
+            <button className="btn h-8 w-8 px-0 text-[11.5px]" onClick={refreshLive} disabled={loading} aria-label="Refresh">
               <Icon name="refresh" size={14} />
             </button>
+            <button className={`btn h-8 px-2 text-[11px] ${sound ? 'border-amber-200 bg-amber-50 text-amber-800' : ''}`} aria-pressed={sound}
+              title="Press M from anywhere to toggle sale sounds" onClick={() => {
+                const enabled = !sound; localStorage.setItem('kestrel:sale-sound', enabled ? 'on' : 'off');
+                window.dispatchEvent(new CustomEvent('kestrel:sale-sound', { detail: { enabled } }));
+              }}>{sound ? 'Sound on · M' : 'Sound off · M'}</button>
           </div>
         </div>
 
@@ -152,12 +189,15 @@ function RealtimeBody() {
           )}
           <ol className="divide-y divide-stone-100">
             {data?.activity.map((e, i) => (
-              <li key={i} className="flex items-center gap-3 py-2.5">
+              <li key={e.sale_id ?? `${e.ts}-${i}`} className={`flex items-center gap-3 py-2.5 ${e.type === 'sale' ? 'rounded-lg bg-amber-50/70 px-2' : ''}`}>
                 <span className="w-11 shrink-0 text-[11px] tabular-nums text-stone-400">{time(e.ts)}</span>
                 <span className="flex w-7 shrink-0 justify-center">
-                  <Avatar id={e.visitor_id} size={26} className="rounded-lg" />
+                  {e.type === 'sale' && !e.visitor_id
+                    ? <span className="flex h-[26px] w-[26px] items-center justify-center rounded-lg bg-amber-100 text-amber-700"><Icon name="dollar" size={15} /></span>
+                    : <Avatar id={e.visitor_id ?? 'sale'} size={26} className="rounded-lg" />}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-[13.5px]">
+                  {e.type === 'sale' ? <span className="mr-1.5 font-semibold text-amber-800">Sale · {fmtMoney(e.amount ?? 0, e.currency ?? site.currency, decimalsFor(e.currency ?? site.currency))}</span> : null}
                   {e.type === 'goal' && <span className="mr-1.5 font-medium text-violet-700">{e.name}</span>}
                   {e.type === 'outbound' ? (
                     <span className="text-stone-600">left to {e.name?.replace(/^https?:\/\//, '')}</span>
@@ -214,6 +254,27 @@ function RealtimeBody() {
       </div>
     </div>
   );
+}
+
+function playSaleChime() {
+  try {
+    const AudioContextClass = window.AudioContext;
+    if (!AudioContextClass) return;
+    const audio = new AudioContextClass();
+    const now = audio.currentTime;
+    [880, 1175, 1568].forEach((frequency, index) => {
+      const oscillator = audio.createOscillator();
+      const gain = audio.createGain();
+      const start = now + index * 0.075;
+      oscillator.type = 'sine'; oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.12, start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.24);
+      oscillator.connect(gain); gain.connect(audio.destination);
+      oscillator.start(start); oscillator.stop(start + 0.25);
+    });
+    window.setTimeout(() => { void audio.close(); }, 500);
+  } catch { /* Audio is optional and can be blocked by the browser. */ }
 }
 
 function SummaryRow({ label, children }: { label: string; children: React.ReactNode }) {

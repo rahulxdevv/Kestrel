@@ -169,7 +169,7 @@ export async function overview(ctx: Ctx) {
   const pageFilter = filterSql(ctx.filters);
   const pageJoin = hasFilters(ctx.filters) ? 'JOIN sessions s ON s.site_id = e.site_id AND s.id = e.session_id' : '';
 
-  const [k1, k0, r1, r0, online, ts, tr, ts2, ts3, ts4] = await db.batch([
+  const [k1, k0, r1, r0, online, ts, tr, ts2, ts3, ts4, imported] = await db.batch([
     db.prepare(KPI_SQL(cur.sql)).bind(range.from, ...cur.params),
     db.prepare(KPI_SQL(prev.sql)).bind(prevFrom, ...prev.params),
     db.prepare(REVENUE_SQL(curPay.sql)).bind(...curPay.params),
@@ -214,6 +214,8 @@ export async function overview(ctx: Ctx) {
          GROUP BY b, e.path ORDER BY visitors DESC`,
       )
       .bind(ctx.site.id, range.from, range.to, ...pageFilter.params),
+    db.prepare('SELECT day, visitors FROM plausible_daily WHERE site_id = ? AND day >= ? AND day < ? ORDER BY day')
+      .bind(site.id, new Intl.DateTimeFormat('en-CA', { timeZone: site.timezone }).format(range.from), new Intl.DateTimeFormat('en-CA', { timeZone: site.timezone }).format(range.to - 1)),
   ]);
 
   const visitorsBy = new Map((ts.results as any[]).map((r) => [r.b, r]));
@@ -228,6 +230,19 @@ export async function overview(ctx: Ctx) {
   const refByBucket = firstPerBucket(ts3.results as any[]);
   const pathByBucket = firstPerBucket(ts4.results as any[]);
   const labels = bucketLabels(range, ctx.offset);
+  const importedByBucket = new Map<string, number>();
+  if (range.granularity !== 'hour') {
+    for (const row of imported.results as { day: string; visitors: number }[]) {
+      let bucket = row.day;
+      if (range.granularity === 'month') bucket = row.day.slice(0, 7);
+      else if (range.granularity === 'week') {
+        const date = new Date(`${row.day}T00:00:00Z`);
+        date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
+        bucket = date.toISOString().slice(0, 10);
+      }
+      importedByBucket.set(bucket, (importedByBucket.get(bucket) ?? 0) + row.visitors);
+    }
+  }
   const series = labels.map((b) => ({
     bucket: b,
     visitors: visitorsBy.get(b)?.visitors ?? 0,
@@ -237,6 +252,7 @@ export async function overview(ctx: Ctx) {
       0,
       (visitorsBy.get(b)?.visitors ?? 0) - Math.min(visitorsBy.get(b)?.new_visitors ?? 0, visitorsBy.get(b)?.visitors ?? 0),
     ),
+    importedVisitors: importedByBucket.get(b) ?? 0,
     revenue: revenueBy.get(b)?.revenue ?? 0,
     payments: revenueBy.get(b)?.payments ?? 0,
     topSource: topByBucket.get(b)?.source ?? null,
@@ -473,7 +489,7 @@ async function demoRealtime(ctx: Ctx, now: number) {
   const places = new Map<string, { country: string; city: string | null; visitors: number; visitorId: string }>();
   const activity: {
     ts: number;
-    type: 'pageview' | 'goal' | 'outbound';
+    type: 'pageview' | 'goal' | 'outbound' | 'sale';
     name: string | null;
     path: string;
     visitor_id: string;
@@ -483,6 +499,9 @@ async function demoRealtime(ctx: Ctx, now: number) {
     device: string | null;
     browser: string | null;
     os: string | null;
+    sale_id?: string;
+    amount?: number;
+    currency?: string;
   }[] = [];
 
   for (let i = 0; i < activeCount; i++) {
@@ -532,6 +551,16 @@ async function demoRealtime(ctx: Ctx, now: number) {
     }
   }
 
+  if (Math.random() < 0.45) {
+    const sample = templates[Math.floor(Math.random() * templates.length)];
+    activity.push({
+      ts: now, type: 'sale', name: null, path: sample.exit_page ?? '/pricing',
+      visitor_id: `demo-sale-${now.toString(36)}`, source: sample.source, country: sample.country, city: sample.city,
+      device: sample.device, browser: sample.browser, os: sample.os, sale_id: `demo-${now.toString(36)}`,
+      amount: (19 + Math.floor(Math.random() * 180)) * 100, currency: ctx.site.currency,
+    });
+  }
+
   const points = [...places.values()].flatMap((place) => {
     const point = geoPoint(place.country, place.city);
     return point ? [{ ...point, ...place }] : [];
@@ -556,16 +585,16 @@ async function demoRealtime(ctx: Ctx, now: number) {
   };
 }
 
-export async function realtime(ctx: Ctx, simulate = false) {
+export async function realtime(ctx: Ctx, simulate = false, after = 0) {
   const now = Date.now();
   if (simulate) {
     const mock = await demoRealtime(ctx, now);
-    if (mock) return mock;
+    if (mock) return { ...mock, sales: mock.activity.filter((event) => event.type === 'sale' && event.ts > after) };
   }
   const since = now - 30 * 60_000;
   const active = now - 5 * 60_000;
   const id = ctx.site.id;
-  const [online, pages, sources, countries, devices, places, activity] = await ctx.db.batch([
+  const [online, pages, sources, countries, devices, places, activity, sales] = await ctx.db.batch([
     ctx.db
       .prepare('SELECT COUNT(DISTINCT visitor_id) AS n FROM sessions WHERE site_id = ? AND last_seen_at > ?')
       .bind(id, active),
@@ -604,11 +633,26 @@ export async function realtime(ctx: Ctx, simulate = false) {
       .bind(id, since),
     ctx.db
       .prepare(
-        `SELECT e.ts, e.type, e.name, e.path, e.visitor_id, s.source, s.country, s.city, s.device, s.browser, s.os
-         FROM events e LEFT JOIN sessions s ON s.site_id = e.site_id AND s.id = e.session_id
-         WHERE e.site_id = ? AND e.ts >= ? ORDER BY e.ts DESC LIMIT 30`,
+        `SELECT * FROM (
+           SELECT e.ts, e.type, e.name, e.path, e.visitor_id, s.source, s.country, s.city, s.device, s.browser, s.os,
+                  NULL AS sale_id, NULL AS amount, NULL AS currency
+           FROM events e LEFT JOIN sessions s ON s.site_id = e.site_id AND s.id = e.session_id
+           WHERE e.site_id = ? AND e.ts >= ?
+           UNION ALL
+           SELECT p.ts, 'sale' AS type, NULL AS name, COALESCE(s.exit_page, '/') AS path,
+                  p.visitor_id, s.source, s.country, s.city, s.device, s.browser, s.os,
+                  p.id AS sale_id, p.amount, p.currency
+           FROM payments p LEFT JOIN sessions s ON s.site_id = p.site_id AND s.id = p.session_id
+           WHERE p.site_id = ? AND p.kind = 'payment' AND p.ts >= ?
+         ) ORDER BY ts DESC LIMIT 30`,
       )
-      .bind(id, since),
+      .bind(id, since, id, since),
+    ctx.db.prepare(
+      `SELECT p.id AS sale_id, p.ts, p.amount, p.currency, p.visitor_id,
+              s.source, s.country, s.city, s.device, s.browser, s.os, COALESCE(s.exit_page, '/') AS path
+       FROM payments p LEFT JOIN sessions s ON s.site_id = p.site_id AND s.id = p.session_id
+       WHERE p.site_id = ? AND p.kind = 'payment' AND p.ts > ? ORDER BY p.ts LIMIT 1000`,
+    ).bind(id, Math.max(since, after)),
   ]);
 
   // Coordinates for the globe. A place we cannot place still counts in `countries`, it just has no dot.
@@ -630,6 +674,7 @@ export async function realtime(ctx: Ctx, simulate = false) {
     devices: devices.results as { label: string; visitors: number }[],
     points,
     activity: activity.results as Record<string, unknown>[],
+    sales: sales.results as Record<string, unknown>[],
     serverTime: now,
   };
 }

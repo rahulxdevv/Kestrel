@@ -12,6 +12,7 @@ Google result next to the money it produced.
 - **Live and visual.** A rotating 3D globe and a flat world map show who is on the site right now.
 - **Agent-ready.** A read-only MCP server lets Claude, Cursor or your own script query your numbers.
 - **Tiny and fast.** A 2.6 KB tracker, no third-party calls, no cookie banner from us.
+- **Readable on every screen.** Dashboard panels, tables and navigation adapt to phones, tablets and desktops.
 - **MIT licensed.** Free for commercial use. © 2026 rahulxdevv.
 
 ---
@@ -29,13 +30,15 @@ Google result next to the money it produced.
 | --- | --- |
 | **Dashboard** | All websites at a glance: revenue, visitors, sales, average order, who is online, 7- and 30-day windows, sorting and per-site sparklines |
 | **Overview** | Visitors (new vs returning), revenue, conversion, revenue per visitor, bounce rate, session time, online now, each compared with the previous period |
-| **Chart** | Visitors and revenue by hour, day, week or month, with the source logo pinned to traffic spikes so you can see *what* caused them |
+| **Chart** | Visitors and revenue by hour, day, week or month, with dated notes pinned to launches and campaigns |
+| **Insights** | Visit and sale peak hours, per-page scroll depth and reading time split by buyers, plus days and visits to purchase |
 | **Content** | Ranked by revenue and visitors: X posts, Instagram reels, YouTube videos, Facebook posts, newsletters, campaigns, landing pages, with a direct link to the post |
 | **Goals** | Multi-series goal and page trends, custom event properties, multi-step funnels with drop-off |
 | **AI assistants** | A dedicated channel for ChatGPT, Claude, Gemini, Perplexity, Copilot, DeepSeek and Grok, over time and by assistant |
-| **Live** | 30-minute realtime view, draggable 3D globe and 2D world map, live pages, sources, countries, devices and an event feed |
+| **Live** | Realtime view, draggable 3D globe and 2D world map, sale events with optional chime (press `M` to toggle), pages, sources and devices |
 | **Audience** | Country, region, city, browser, OS, device, hostname, entry and exit pages, outbound links |
-| **Revenue** | Customer journeys with source, amount and time to convert; Dodo Payments webhooks plus a generic payments API |
+| **Revenue** | Customer journeys with source, amount and time to convert; Dodo webhooks and a provider-tagged API for Lemon Squeezy, Paddle, Gumroad or custom billing |
+| **Plausible import** | Import daily aggregate CSV history; it stays separate from visitor-level Kestrel records and attribution |
 | **Agents** | MCP server with seven read-only tools, site-scoped API keys, copy-paste config for Claude Code and Cursor |
 | **Languages** | Dashboard navigation, metrics and grids in English, Spanish, German, French, Portuguese, Hindi, Japanese and Chinese |
 | **Sharing** | Read-only public dashboard link per site, no accounts required |
@@ -190,12 +193,24 @@ re-runs the fallbacks. Refunds are subtracted from revenue.
 
 ### Any other provider
 
+Normalize provider webhook events on your server and send them to the generic endpoint. Use the optional
+`provider` field (`lemon_squeezy`, `paddle`, `gumroad`, `stripe`, or your own label). Keep the API key
+server-side. Visitor and session IDs can be supplied as checkout metadata; if they are absent, Kestrel
+tries a return-page claim, existing customer/email identity, then an unambiguous recent checkout signal.
+
 ```bash
 curl -X POST https://YOUR-HOST/api/v1/payments \
   -H "Authorization: Bearer k_..." \
   -H "Content-Type: application/json" \
-  -d '{"transaction_id":"txn_1","amount":29.99,"currency":"USD","visitor_id":"<kt_vid cookie>","email":"jane@acme.com"}'
+  -d '{"transaction_id":"txn_1","provider":"gumroad","amount":29.99,"currency":"USD","visitor_id":"<kt_vid cookie>","email":"jane@acme.com"}'
 ```
+
+### Import from Plausible
+
+In site settings, import a daily metrics CSV with `date`, `visitors`, `visits`, and `pageviews` columns;
+`bounce_rate` and `visit_duration` are optional. Imported daily aggregates are displayed as a separate
+series and summary. They do not fabricate individual visitors, payments, or source attribution. Reimporting
+a date replaces that date's imported totals.
 
 ---
 
@@ -283,6 +298,7 @@ D1 replaces SQLite; the same Hono app, queries and dashboard are used.
   requests and sells no data; whether you need a consent banner depends on your jurisdiction. The dataset is
   deliberately minimal and no full IP address is stored.
 - **Bots are filtered** by user agent and `navigator.webdriver`.
+- **Engagement is aggregate.** The tracker records visible reading time and maximum scroll percentage per page and session; it does not record keystrokes or page contents.
 - **No analytics tool is perfectly accurate.** Ad blockers may drop the tracker; payments still arrive by
   webhook and are matched to a visitor.
 - **Safari** caps JavaScript cookies at seven days. A returning Safari visitor may count as new; email and

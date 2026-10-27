@@ -8,6 +8,9 @@ import { clientIp, isSecureRequest } from './lib/client';
 import { passwordsMatch, randomId, signToken, verifyToken } from './lib/crypto';
 import { handleMcp } from './mcp';
 import { handleDodoWebhook, handleGoalApi, handlePaymentApi, rematchPayments } from './payments';
+import { pageEngagement, peakHours, purchaseJourney } from './insights';
+import { bucketSql } from './lib/time';
+import { getPlausibleImport, importPlausibleCsv } from './plausible-import';
 import {
   aiTraffic,
   breakdown,
@@ -314,7 +317,7 @@ app.delete('/api/sites/:id/share', async (c) => {
 app.delete('/api/sites/:id', async (c) => {
   const id = c.get('site').id;
   await c.env.DB.batch(
-    ['events', 'sessions', 'visitors', 'payments', 'payment_claims', 'funnels'].map((t) =>
+    ['events', 'sessions', 'visitors', 'payments', 'payment_claims', 'funnels', 'page_engagement', 'chart_notes', 'plausible_daily'].map((t) =>
       c.env.DB.prepare(`DELETE FROM ${t} WHERE site_id = ?`).bind(id),
     ).concat(c.env.DB.prepare('DELETE FROM sites WHERE id = ?').bind(id)),
   );
@@ -342,7 +345,40 @@ app.get('/api/sites/:id/ai', async (c) => c.json(await aiTraffic(makeCtx(c))));
 app.get('/api/sites/:id/timeseries', async (c) =>
   c.json(await timeseries(makeCtx(c), c.req.query('dim') === 'page' ? 'page' : 'goal', Number(c.req.query('limit')) || 7)),
 );
-app.get('/api/sites/:id/realtime', async (c) => c.json(await realtime(makeCtx(c), isDemoMode(c))));
+app.get('/api/sites/:id/realtime', async (c) => c.json(await realtime(makeCtx(c), isDemoMode(c), Number(c.req.query('after')) || 0)));
+app.get('/api/sites/:id/imports/plausible', getPlausibleImport);
+app.post('/api/sites/:id/imports/plausible', importPlausibleCsv);
+app.get('/api/sites/:id/insights/peak-hours', async (c) => {
+  const ctx = makeCtx(c);
+  return c.json(await peakHours(c.env.DB, ctx.site, ctx.range.from, ctx.range.to));
+});
+app.get('/api/sites/:id/insights/engagement', async (c) => {
+  const ctx = makeCtx(c);
+  return c.json(await pageEngagement(c.env.DB, ctx.site, ctx.range.from, ctx.range.to));
+});
+app.get('/api/sites/:id/insights/purchase-journey', async (c) => {
+  const ctx = makeCtx(c);
+  return c.json(await purchaseJourney(c.env.DB, ctx.site, ctx.range.from, ctx.range.to));
+});
+app.get('/api/sites/:id/notes', async (c) => {
+  const ctx = makeCtx(c);
+  const bucket = bucketSql('ts', ctx.range.granularity, ctx.offset);
+  return c.json(await c.env.DB.prepare(`SELECT id, ts, label, ${bucket} AS bucket FROM chart_notes WHERE site_id = ? AND ts >= ? AND ts < ? ORDER BY ts`)
+    .bind(ctx.site.id, ctx.range.from, ctx.range.to).all());
+});
+app.post('/api/sites/:id/notes', async (c) => {
+  const body = await c.req.json<{ ts?: number; label?: string }>().catch((): { ts?: number; label?: string } => ({}));
+  if (!Number.isFinite(body.ts) || typeof body.label !== 'string' || !body.label.trim()) return c.json({ error: 'A date and note are required.' }, 400);
+  const id = randomId(10);
+  const label = body.label.trim().slice(0, 120);
+  await c.env.DB.prepare('INSERT INTO chart_notes (id, site_id, ts, label, created_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(id, c.get('site').id, Math.round(body.ts!), label, Date.now()).run();
+  return c.json({ id, ts: Math.round(body.ts!), label }, 201);
+});
+app.delete('/api/sites/:id/notes/:nid', async (c) => {
+  await c.env.DB.prepare('DELETE FROM chart_notes WHERE site_id = ? AND id = ?').bind(c.get('site').id, c.req.param('nid')).run();
+  return c.json({ ok: true });
+});
 app.get('/api/sites/:id/export', handleExport);
 app.post('/api/sites/:id/rematch', async (c) => c.json(await rematchPayments(c.env.DB, c.get('site'))));
 app.get('/api/sites/:id/customers', async (c) => c.json(await customers(makeCtx(c))));

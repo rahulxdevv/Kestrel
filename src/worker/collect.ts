@@ -7,7 +7,7 @@ import { isRateLimited } from './lib/ratelimit';
 import { isBot, parseUA } from './lib/ua';
 import { creditedSessionSql } from './payments';
 
-const TYPES = new Set(['pageview', 'goal', 'outbound', 'ping', 'identify']);
+const TYPES = new Set(['pageview', 'goal', 'outbound', 'ping', 'identify', 'engagement']);
 const MAX_PING_MS = 10 * 60_000;
 
 interface Payload {
@@ -21,6 +21,8 @@ interface Payload {
   n?: string;
   p?: Record<string, unknown>;
   d?: number;
+  rt?: number;
+  sd?: number;
 }
 
 const clip = (s: unknown, n = 255): string | null =>
@@ -137,6 +139,23 @@ export async function ingest(
     await db
       .prepare('UPDATE sessions SET duration = duration + ?, last_seen_at = ? WHERE site_id = ? AND id = ?')
       .bind(ms, now, site.id, sid)
+      .run();
+    return;
+  }
+
+  if (t === 'engagement') {
+    const readingMs = Math.max(0, Math.min(MAX_PING_MS * 3, Math.round(Number(body.rt) || 0)));
+    const scrollDepth = Math.max(0, Math.min(100, Math.round(Number(body.sd) || 0)));
+    await db
+      .prepare(
+        `INSERT INTO page_engagement (site_id, session_id, visitor_id, path, reading_ms, scroll_depth, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (site_id, session_id, path) DO UPDATE SET
+           reading_ms = MAX(page_engagement.reading_ms, excluded.reading_ms),
+           scroll_depth = MAX(page_engagement.scroll_depth, excluded.scroll_depth),
+           updated_at = excluded.updated_at`,
+      )
+      .bind(site.id, sid, vid, path, readingMs, scrollDepth, now)
       .run();
     return;
   }

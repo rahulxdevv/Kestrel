@@ -1,17 +1,42 @@
-import { Area, Bar, CartesianGrid, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import type { Overview } from '../lib/api';
-import { bucketLabel, bucketTitle, fmtDuration, fmtMoney, fmtNumber, fmtPct } from '../lib/format';
+import { useState } from 'react';
+import { Area, Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { api, qs, type Overview } from '../lib/api';
+import { useDash } from '../lib/context';
+import { bucketLabel, bucketTitle, dayInTz, fmtDuration, fmtMoney, fmtNumber, fmtPct } from '../lib/format';
 import { useT } from '../lib/i18n';
+import { useApi } from '../lib/useApi';
 import { Delta } from './Sparkline';
 
 type Series = Overview['series'][number];
 
 export function OverviewCard({ data }: { data: Overview | null }) {
   const { t } = useT();
+  const { apiBase, q, reloadKey, site, readOnly, demoMode } = useDash();
+  const [noteReload, setNoteReload] = useState(0);
+  const [noteDate, setNoteDate] = useState(() => dayInTz(Date.now(), site.timezone));
+  const [noteLabel, setNoteLabel] = useState('');
+  const [noteError, setNoteError] = useState('');
+  const notesUrl = !readOnly ? `${apiBase}/notes?${qs(q)}` : null;
+  const { data: notes } = useApi<{ id: string; ts: number; label: string; bucket: string }[]>(notesUrl, reloadKey + noteReload);
   const current = data?.current;
   const previous = data?.previous;
   const granularity = data?.range.granularity ?? 'day';
   const series = data?.series ?? [];
+
+  async function addNote(e: React.FormEvent) {
+    e.preventDefault();
+    if (!noteLabel.trim()) return;
+    const ts = localDateNoon(noteDate, site.timezone);
+    try {
+      await api(`${apiBase}/notes`, { method: 'POST', json: { ts, label: noteLabel } });
+      setNoteLabel(''); setNoteError(''); setNoteReload((n) => n + 1);
+    } catch (error) { setNoteError((error as Error).message); }
+  }
+
+  async function removeNote(id: string) {
+    try { await api(`${apiBase}/notes/${id}`, { method: 'DELETE' }); setNoteReload((n) => n + 1); }
+    catch (error) { setNoteError((error as Error).message); }
+  }
 
   return (
     <section className="card overflow-hidden bg-white" aria-label={t('overview.chart')}>
@@ -38,9 +63,10 @@ export function OverviewCard({ data }: { data: Overview | null }) {
             {t('overview.chart')} <span className="px-1 text-stone-300">·</span>
             <span className="capitalize">{granularity}</span>
           </h2>
-          <div className="flex shrink-0 items-center gap-4 text-[11px] text-stone-500">
+          <div className="flex max-w-full flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-stone-500">
             <span className="flex items-center gap-1.5"><i className="h-[2px] w-3 rounded bg-sky-400" />{t('common.visitors')}</span>
             <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-[2px] bg-orange-400" />{t('common.revenue')}</span>
+            {series.some((point) => point.importedVisitors) && <span className="flex items-center gap-1.5"><i className="h-0 w-3 border-t-2 border-dashed border-violet-400" />Plausible history</span>}
           </div>
         </div>
 
@@ -83,6 +109,7 @@ export function OverviewCard({ data }: { data: Overview | null }) {
                     if (!active || !payload?.length) return null;
                     const point = payload[0].payload as Series;
                     const visitors = point.visitors ?? 0;
+                    const importedVisitors = point.importedVisitors ?? 0;
                     const newVisitors = Math.min(point.newVisitors ?? 0, visitors);
                     const returningVisitors = Math.max(0, visitors - newVisitors);
                     const newShare = visitors ? (newVisitors / visitors) * 100 : 0;
@@ -109,6 +136,7 @@ export function OverviewCard({ data }: { data: Overview | null }) {
                           <span className="text-stone-500">{t('common.sales')}</span>
                           <span className="font-medium tabular-nums text-stone-700">{fmtNumber(point.payments)}</span>
                         </div>
+                        {importedVisitors > 0 && <div className="flex items-center justify-between gap-5 border-t border-stone-100 py-1.5"><span className="text-violet-700">Plausible daily visitors</span><b className="font-medium tabular-nums text-violet-800">{fmtNumber(importedVisitors)}</b></div>}
                         {point.topSource && point.topVisitors ? (
                           <div className="mt-2 border-t border-stone-100 pt-2 text-[10px] text-stone-500">
                             Top source: <span className="font-medium text-stone-700">{point.topSource}</span> · {fmtNumber(point.topVisitors)} {t('common.visitors').toLowerCase()}
@@ -118,6 +146,10 @@ export function OverviewCard({ data }: { data: Overview | null }) {
                     );
                   }}
                 />
+                {(notes ?? []).map((note) => series.some((point) => point.bucket === note.bucket) ? (
+                  <ReferenceLine key={note.id} x={note.bucket} stroke="#e87979" strokeDasharray="4 4"
+                    label={{ value: note.label, position: 'insideTop', fill: '#9f4b4b', fontSize: 10 }} />
+                ) : null)}
                 <Bar yAxisId="revenue" dataKey="revenue" fill="#ee8b70" radius={[3, 3, 0, 0]} maxBarSize={26} isAnimationActive={false} />
                 <Area
                   yAxisId="visitors"
@@ -131,14 +163,33 @@ export function OverviewCard({ data }: { data: Overview | null }) {
                   activeDot={{ r: 4, fill: '#79b8e8', stroke: '#fff', strokeWidth: 2 }}
                   isAnimationActive={false}
                 />
+                {series.some((point) => point.importedVisitors) && <Line yAxisId="visitors" type="monotone" dataKey="importedVisitors" stroke="#8b79bf" strokeWidth={2} strokeDasharray="5 4" dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />}
               </ComposedChart>
             </ResponsiveContainer>
           )}
           {data && series.length === 0 && <div className="flex h-full items-center justify-center text-sm text-stone-400">No activity in this period</div>}
         </div>
+        {!readOnly && !demoMode && <div className="mt-3 border-t border-stone-100 pt-3">
+          <form onSubmit={addNote} className="flex flex-wrap items-center gap-2">
+            <label className="sr-only" htmlFor="chart-note-date">Note date</label>
+            <input id="chart-note-date" type="date" className="input h-9 w-[150px] py-1.5 text-xs" value={noteDate} onChange={(e) => setNoteDate(e.target.value)} />
+            <label className="sr-only" htmlFor="chart-note-label">Chart note</label>
+            <input id="chart-note-label" className="input h-9 min-w-[160px] flex-1 py-1.5 text-xs" maxLength={120} placeholder="Add a chart note, e.g. Product Hunt launch" value={noteLabel} onChange={(e) => setNoteLabel(e.target.value)} />
+            <button className="btn h-9" disabled={!noteLabel.trim()}>Pin note</button>
+          </form>
+          {noteError && <p className="mt-2 text-xs text-rose-600">{noteError}</p>}
+        </div>}
+        {!!notes?.length && <div className="mt-2 flex flex-wrap gap-2">{notes.map((note) => <span key={note.id} className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-rose-50 px-2 py-1 text-[11px] text-rose-800"><span className="max-w-[220px] truncate">{note.label}</span>{!demoMode && !readOnly && <button onClick={() => removeNote(note.id)} className="rounded px-1 text-rose-500 hover:bg-rose-100" aria-label={`Remove note ${note.label}`}>×</button>}</span>)}</div>}
       </div>
     </section>
   );
+}
+
+function localDateNoon(day: string, timeZone: string) {
+  const utcNoon = Date.parse(`${day}T12:00:00Z`);
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(utcNoon));
+  const get = (key: string) => Number(parts.find((p) => p.type === key)?.value);
+  return utcNoon - (Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute')) - utcNoon);
 }
 
 function Metric({

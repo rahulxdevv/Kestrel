@@ -199,7 +199,7 @@ const SPIKE_DAY = 2;
 
 db.exec('BEGIN IMMEDIATE');
 try {
-  for (const table of ['events', 'sessions', 'visitors', 'payments', 'funnels']) {
+  for (const table of ['events', 'sessions', 'visitors', 'payments', 'funnels', 'page_engagement', 'chart_notes', 'plausible_daily']) {
     db.prepare(`DELETE FROM ${table} WHERE site_id = ?`).run(siteId);
   }
   db.prepare('DELETE FROM sites WHERE id = ?').run(siteId);
@@ -388,6 +388,24 @@ try {
     eventStmt.run(siteId, sid, vid, started, 'pageview', null, '/', null);
     eventStmt.run(siteId, sid, vid, now - 5000, 'pageview', null, '/pricing', null);
   });
+
+  const engagementStmt = db.prepare(
+    `INSERT INTO page_engagement (site_id, session_id, visitor_id, path, reading_ms, scroll_depth, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  );
+  const engagementPages = db.prepare(
+    `SELECT e.session_id, e.visitor_id, e.path, MAX(e.ts) AS ts,
+            EXISTS (SELECT 1 FROM payments p WHERE p.site_id = e.site_id AND p.visitor_id = e.visitor_id AND p.kind = 'payment') AS buyer
+     FROM events e WHERE e.site_id = ? AND e.type = 'pageview' GROUP BY e.session_id, e.visitor_id, e.path`,
+  ).all(siteId);
+  for (const page of engagementPages) {
+    const scroll = page.buyer ? between(58, 96) : between(32, 91);
+    const reading = page.buyer ? between(42, 190) : between(18, 155);
+    engagementStmt.run(siteId, page.session_id, page.visitor_id, page.path, reading * 1000, scroll, page.ts);
+  }
+  db.prepare('INSERT INTO chart_notes (id, site_id, ts, label, created_at) VALUES (?, ?, ?, ?, ?)').run(
+    'demo-note-launch', siteId, today - 2 * DAY + 15 * 3_600_000, 'Product Hunt launch', now,
+  );
 
   db.exec('COMMIT');
   console.log(`✓ Seeded ${visitors} visitors, ${payments} payments across 30 days (+${LIVE.length} live visitors).`);

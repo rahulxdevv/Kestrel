@@ -825,7 +825,7 @@ function RevenuePanel({
             <div>
               <h2 className="text-[16px] font-semibold tracking-tight">Another payment provider</h2>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-500">
-                Stripe, Lemon Squeezy, Polar, Paddle or a custom checkout all work through the server-side API.
+                Stripe, Lemon Squeezy, Gumroad, Paddle or your own billing system can send payment events through the server-side API.
               </p>
             </div>
           </div>
@@ -843,9 +843,10 @@ function RevenuePanel({
             code={`curl -X POST ${origin}/api/v1/payments \\\n  -H "Authorization: Bearer ${site.api_key}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "transaction_id": "txn_123",\n    "amount": 29.99,\n    "currency": "${site.currency}",\n    "visitor_id": "<kt_vid cookie>",\n    "email": "jane@acme.com"\n  }'`}
           />
           <p className="mt-3 text-xs leading-5 text-stone-500">
-            Call this from your provider’s webhook and pass the visitor ID you stored at checkout. Kestrel matches the payment to that
-            visitor and the source that brought them.
+            Normalize the provider webhook in your server and call this endpoint. Pass the visitor ID saved at checkout when available;
+            otherwise Kestrel tries a return-page claim, customer/email history, and a unique recent checkout signal. Keep the API key on your server.
           </p>
+          <p className="mt-2 text-xs leading-5 text-stone-500">Set the optional <code className="rounded bg-stone-100 px-1 py-0.5">provider</code> field to <code className="rounded bg-stone-100 px-1 py-0.5">lemon_squeezy</code>, <code className="rounded bg-stone-100 px-1 py-0.5">paddle</code>, <code className="rounded bg-stone-100 px-1 py-0.5">gumroad</code>, <code className="rounded bg-stone-100 px-1 py-0.5">stripe</code> or your own provider name.</p>
         </div>
       </details>
     </>
@@ -985,6 +986,8 @@ function DataPanel({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmDomain, setConfirmDomain] = useState('');
   const [busy, setBusy] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
   const masked = `${site.api_key.slice(0, 4)}${'•'.repeat(18)}${site.api_key.slice(-4)}`;
 
   async function rotate() {
@@ -1012,6 +1015,18 @@ function DataPanel({
       notify((e as Error).message, 'error');
       setBusy(false);
     }
+  }
+
+  async function importPlausible() {
+    if (!importFile) return;
+    setImporting(true);
+    try {
+      const csv = await importFile.text();
+      const result = await api<{ imported: number; from: string; to: string }>(`/api/sites/${site.id}/imports/plausible`, { method: 'POST', json: { csv } });
+      notify(`Imported ${result.imported} daily rows (${result.from} to ${result.to}).`);
+      setImportFile(null);
+    } catch (e) { notify((e as Error).message, 'error'); }
+    finally { setImporting(false); }
   }
 
   return (
@@ -1068,6 +1083,14 @@ function DataPanel({
         </p>
       </PanelCard>
 
+      <PanelCard title="Import Plausible history" description="Bring in daily aggregate metrics from a Plausible CSV export. Imported totals stay labeled separately and do not create visitor profiles or attribution." icon="database">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <input type="file" accept=".csv,text/csv" className="input min-w-0 flex-1 py-2 text-xs" onChange={(e) => setImportFile(e.target.files?.[0] ?? null)} />
+          <button className="btn h-10 shrink-0" disabled={!importFile || importing} onClick={importPlausible}>{importing ? 'Importing…' : 'Import CSV'}</button>
+        </div>
+        <p className="mt-2 text-xs leading-5 text-stone-500">Daily report columns: date, visitors, visits, pageviews, bounce_rate, visit_duration. Reimporting the same dates replaces those imported aggregates. Keep the export under 5 MB.</p>
+      </PanelCard>
+
       <section className="card border-red-200/80 p-5 sm:p-6">
         <div className="flex gap-3">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-500">
@@ -1076,7 +1099,7 @@ function DataPanel({
           <div>
             <h2 className="text-[16px] font-semibold tracking-tight">Delete this website</h2>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-500">
-              Permanently remove visitors, sessions, events, goals, funnels and payments for <b>{site.domain}</b>. There is no undo.
+              Permanently remove visitors, sessions, engagement records, chart notes, imports, funnels and payments for <b>{site.domain}</b>. There is no undo.
             </p>
           </div>
         </div>

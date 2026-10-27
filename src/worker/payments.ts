@@ -86,7 +86,9 @@ async function attribute(db: Db, site: Site, p: PaymentInput) {
       .prepare(
         `SELECT DISTINCT e.visitor_id FROM events e
          WHERE e.site_id = ? AND e.ts BETWEEN ? AND ?
-           AND ((e.type = 'outbound' AND e.name LIKE '%dodopayments.com%')
+           AND ((e.type = 'outbound' AND (
+                  e.name LIKE '%dodopayments.com%' OR e.name LIKE '%lemonsqueezy.com%' OR e.name LIKE '%paddle.com%'
+                  OR e.name LIKE '%gumroad.com%' OR e.name LIKE '%checkout.stripe.com%'))
                 OR (e.type = 'goal' AND (e.name LIKE '%checkout%' OR e.name LIKE '%buy%' OR e.name LIKE '%purchase%')))
            AND NOT EXISTS (SELECT 1 FROM payments o WHERE o.site_id = e.site_id AND o.visitor_id = e.visitor_id
                            AND o.kind = 'payment' AND o.id != ? AND o.ts BETWEEN ? AND ?)
@@ -268,7 +270,8 @@ async function siteFromApiKey(c: Context<AppEnv>): Promise<Site | null> {
 }
 
 /**
- * Generic payments API, for any provider without a built-in integration.
+ * Generic payments API, for any provider without a built-in integration. Provider adapters
+ * (Lemon Squeezy, Paddle, Gumroad, or a private billing system) normalize webhook events here.
  * POST /api/v1/payments  Authorization: Bearer <site api key>
  * { "transaction_id": "...", "amount": 29.99, "currency": "USD", "visitor_id": "<kt_vid cookie>", "email": "..." }
  */
@@ -280,11 +283,12 @@ export async function handlePaymentApi(c: Context<AppEnv>) {
     return c.json({ error: 'transaction_id (string) and amount (number, e.g. 29.99) are required' }, 400);
   }
   const currency = (str(b.currency) ?? site.currency).toUpperCase();
+  const provider = (str(b.provider) ?? 'custom').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 48) || 'custom';
   const minor = Math.round((b.amount as number) * 10 ** currencyDecimals(currency));
   const refunded = b.refunded === true;
   const res = await recordPayment(c.env.DB, site, {
-    id: `${site.id}:${b.transaction_id}${refunded ? ':refund' : ''}`,
-    provider: 'api',
+    id: `${site.id}:${provider}:${b.transaction_id}${refunded ? ':refund' : ''}`,
+    provider,
     ts: typeof b.timestamp === 'string' ? Date.parse(b.timestamp) || Date.now() : Date.now(),
     amount: refunded ? -Math.abs(minor) : minor,
     kind: refunded ? 'refund' : 'payment',

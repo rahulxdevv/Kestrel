@@ -3,6 +3,7 @@ import { SiteFrame } from '../components/SiteFrame';
 import { Icon } from '../components/NavIcons';
 import { useDash } from '../lib/context';
 import { useT } from '../lib/i18n';
+import { useState } from 'react';
 
 export function Content({ siteId, demoMode = false }: { siteId: string; demoMode?: boolean }) {
   return (
@@ -15,6 +16,14 @@ export function Content({ siteId, demoMode = false }: { siteId: string; demoMode
 function ContentBody() {
   const { site } = useDash();
   const { t } = useT();
+  const [campaign, setCampaign] = useState({ source: '', medium: '', name: '', content: '', term: '' });
+  const [copied, setCopied] = useState(false);
+  const campaignUrl = (() => {
+    const url = new URL(`https://${site.domain}/`);
+    const keys = { source: 'utm_source', medium: 'utm_medium', name: 'utm_campaign', content: 'utm_content', term: 'utm_term' } as const;
+    for (const [key, param] of Object.entries(keys)) if (campaign[key as keyof typeof campaign].trim()) url.searchParams.set(param, campaign[key as keyof typeof campaign].trim());
+    return url.toString();
+  })();
   const examples = [
     { label: 'X post', url: `https://${site.domain}/?ref=https://x.com/you/status/1234567890` },
     { label: 'YouTube', url: `https://${site.domain}/?utm_source=youtube&utm_content=review-2026` },
@@ -25,6 +34,25 @@ function ContentBody() {
   return (
     <div className="space-y-4">
       <ContentPanel mode="full" />
+
+      <section className="card min-w-0 p-4 sm:p-5">
+        <div>
+          <h2 className="text-[15px] font-semibold">Campaign link builder</h2>
+          <p className="mt-1 text-xs text-stone-500">Tag a link once, then see the campaign and its revenue in your reports.</p>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {([
+            ['source', 'Source', 'newsletter'], ['medium', 'Medium', 'email'], ['name', 'Campaign', 'spring-launch'],
+            ['content', 'Content', 'header-link'], ['term', 'Term', ''],
+          ] as const).map(([key, label, placeholder]) => <label key={key} className="min-w-0 text-xs font-medium text-stone-600">
+            {label}<input className="input mt-1.5 h-9 w-full text-xs" value={campaign[key]} placeholder={placeholder} onChange={(e) => setCampaign((c) => ({ ...c, [key]: e.target.value }))} />
+          </label>)}
+        </div>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <div className="min-w-0 flex-1 break-all rounded-lg bg-stone-50 px-3 py-2 font-mono text-[11px] text-stone-600">{campaignUrl}</div>
+          <button className="btn h-9 shrink-0" onClick={async () => { try { await navigator.clipboard.writeText(campaignUrl); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { setCopied(false); } }}>{copied ? 'Copied' : 'Copy link'}</button>
+        </div>
+      </section>
 
       <section className="card p-5">
         <div className="flex items-center gap-2">

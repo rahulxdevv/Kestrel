@@ -8,12 +8,13 @@ import { LanguagePicker } from './LanguagePicker';
 import { Logo, LogoMark } from './Logo';
 import { Icon } from './NavIcons';
 
-export type Section = 'overview' | 'realtime' | 'content' | 'audience' | 'goals' | 'settings';
+export type Section = 'overview' | 'realtime' | 'content' | 'insights' | 'audience' | 'goals' | 'settings';
 
-const NAV: { key: Section; labelKey: string; icon: string; path: string }[] = [
+const NAV: { key: Section; labelKey: string; label?: string; icon: string; path: string }[] = [
   { key: 'overview', labelKey: 'nav.overview', icon: 'overview', path: '' },
   { key: 'realtime', labelKey: 'nav.realtime', icon: 'pulse', path: '/realtime' },
   { key: 'content', labelKey: 'nav.content', icon: 'tag', path: '/content' },
+  { key: 'insights', labelKey: 'nav.insights', label: 'Insights', icon: 'chart', path: '/insights' },
   { key: 'audience', labelKey: 'nav.audience', icon: 'users', path: '/audience' },
   { key: 'goals', labelKey: 'nav.goals', icon: 'target', path: '/goals' },
 ];
@@ -120,7 +121,7 @@ export function Shell({
           }
         >
           <Icon name={item.icon} size={17} className={isActive ? 'text-rust' : 'text-stone-400'} />
-          {t(item.labelKey)}
+          {item.label ?? t(item.labelKey)}
         </button>
       );
     });

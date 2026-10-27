@@ -5,6 +5,7 @@ import { LogoMark } from './components/Logo';
 import { Audience } from './pages/Audience';
 import { Content } from './pages/Content';
 import { Goals } from './pages/Goals';
+import { Insights } from './pages/Insights';
 import { Login } from './pages/Login';
 import { Overview } from './pages/Overview';
 import { Realtime } from './pages/Realtime';
@@ -29,6 +30,19 @@ export function App() {
   const [auth, setAuth] = useState<{ loggedIn: boolean; demoMode: boolean } | null>(null);
 
   useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (event.key.toLowerCase() !== 'm' || event.altKey || event.ctrlKey || event.metaKey ||
+          target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '')) return;
+      const enabled = localStorage.getItem('kestrel:sale-sound') !== 'on';
+      localStorage.setItem('kestrel:sale-sound', enabled ? 'on' : 'off');
+      window.dispatchEvent(new CustomEvent('kestrel:sale-sound', { detail: { enabled } }));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  useEffect(() => {
     api<{ loggedIn: boolean; demoMode?: boolean }>('/api/auth/me')
       .then((r) => setAuth({ loggedIn: r.loggedIn, demoMode: Boolean(r.demoMode) }))
       .catch(() => setAuth({ loggedIn: false, demoMode: false }));
@@ -41,13 +55,14 @@ export function App() {
   if (share && !auth.demoMode) return <ShareView token={share[1]} />;
 
   const demoSiteId = 'kestrel-demo';
-  const route = /^\/site\/([\w-]+)(?:\/(settings|realtime|audience|goals|content))?\/?$/.exec(path);
+  const route = /^\/site\/([\w-]+)(?:\/(settings|realtime|audience|goals|content|insights))?\/?$/.exec(path);
   if (auth.demoMode) {
     const demoPage = route?.[1] === demoSiteId ? route[2] : undefined;
     if (demoPage === 'realtime') return <Realtime siteId={demoSiteId} demoMode />;
     if (demoPage === 'audience') return <Audience siteId={demoSiteId} demoMode />;
     if (demoPage === 'goals') return <Goals siteId={demoSiteId} demoMode />;
     if (demoPage === 'content') return <Content siteId={demoSiteId} demoMode />;
+    if (demoPage === 'insights') return <Insights siteId={demoSiteId} demoMode />;
     return <Overview siteId={demoSiteId} demoMode />;
   }
 
@@ -61,6 +76,7 @@ export function App() {
     if (page === 'audience') return <Audience siteId={siteId} />;
     if (page === 'goals') return <Goals siteId={siteId} />;
     if (page === 'content') return <Content siteId={siteId} />;
+    if (page === 'insights') return <Insights siteId={siteId} />;
     return <Overview siteId={siteId} />;
   }
   return <Sites />;

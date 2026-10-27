@@ -54,16 +54,19 @@ export interface Kpis {
 
 export interface LiveActivity {
   ts: number;
-  type: 'pageview' | 'goal' | 'outbound';
+  type: 'pageview' | 'goal' | 'outbound' | 'sale';
   name: string | null;
   path: string;
-  visitor_id: string;
+  visitor_id: string | null;
   source: string | null;
   country: string | null;
   city: string | null;
   device: string | null;
   browser: string | null;
   os: string | null;
+  sale_id?: string | null;
+  amount?: number | null;
+  currency?: string | null;
 }
 
 export interface LivePoint {
@@ -85,6 +88,7 @@ export interface LiveData {
   devices: { label: string | null; visitors: number }[];
   points: LivePoint[];
   activity: LiveActivity[];
+  sales: LiveActivity[];
   serverTime: number;
 }
 
@@ -159,6 +163,7 @@ export interface Overview {
   series: {
     bucket: string;
     visitors: number;
+    importedVisitors?: number;
     pageviews: number;
     newVisitors: number;
     returningVisitors: number;
