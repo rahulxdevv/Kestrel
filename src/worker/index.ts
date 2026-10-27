@@ -7,7 +7,7 @@ import { handleExport } from './export';
 import { clientIp, isSecureRequest } from './lib/client';
 import { passwordsMatch, randomId, signToken, verifyToken } from './lib/crypto';
 import { handleMcp } from './mcp';
-import { handleDodoWebhook, handleGoalApi, handlePaymentApi, rematchPayments } from './payments';
+import { handleDodoWebhook, handleGoalApi, handlePaymentApi, handlePolarWebhook, handleRazorpayWebhook, handleStripeWebhook, rematchPayments } from './payments';
 import { pageEngagement, peakHours, purchaseJourney } from './insights';
 import { bucketSql } from './lib/time';
 import { getPlausibleImport, importPlausibleCsv } from './plausible-import';
@@ -58,6 +58,9 @@ app.use('/api/*', async (c, next) => {
 app.use('/api/event', cors({ origin: '*', allowMethods: ['POST', 'OPTIONS'], maxAge: 86400 }));
 app.post('/api/event', handleEvent);
 app.post('/api/webhooks/dodo/:siteId', handleDodoWebhook);
+app.post('/api/webhooks/polar/:siteId', handlePolarWebhook);
+app.post('/api/webhooks/stripe/:siteId', handleStripeWebhook);
+app.post('/api/webhooks/razorpay/:siteId', handleRazorpayWebhook);
 app.post('/api/v1/payments', handlePaymentApi);
 app.post('/api/v1/goals', handleGoalApi);
 
@@ -180,7 +183,13 @@ function validTimezone(tz: string) {
   }
 }
 
-const publicSite = (s: Site) => ({ ...s, dodo_webhook_secret: s.dodo_webhook_secret ? '••••••••' : null });
+const publicSite = (s: Site) => ({
+  ...s,
+  dodo_webhook_secret: s.dodo_webhook_secret ? '••••••••' : null,
+  polar_webhook_secret: s.polar_webhook_secret ? '••••••••' : null,
+  stripe_webhook_secret: s.stripe_webhook_secret ? '••••••••' : null,
+  razorpay_webhook_secret: s.razorpay_webhook_secret ? '••••••••' : null,
+});
 
 /** Everything a shared viewer may see: no keys, no secret, no visitor identities. */
 const sharedSite = (s: Site) => ({
@@ -197,6 +206,9 @@ const demoSite = (s: Site) => ({
   ...sharedSite(s),
   api_key: '',
   dodo_webhook_secret: null,
+  polar_webhook_secret: null,
+  stripe_webhook_secret: null,
+  razorpay_webhook_secret: null,
   share_token: null,
 });
 
@@ -256,6 +268,9 @@ app.post('/api/sites', async (c) => {
     currency: (b.currency || 'USD').toUpperCase().slice(0, 3),
     api_key: 'k_' + randomId(16),
     dodo_webhook_secret: null,
+    polar_webhook_secret: null,
+    stripe_webhook_secret: null,
+    razorpay_webhook_secret: null,
     share_token: null,
     created_at: Date.now(),
   };
@@ -287,8 +302,11 @@ app.patch('/api/sites/:id', async (c) => {
   if (typeof b.dodo_webhook_secret === 'string' && !b.dodo_webhook_secret.includes('•')) {
     next.dodo_webhook_secret = b.dodo_webhook_secret.trim() || null;
   }
-  await c.env.DB.prepare('UPDATE sites SET name = ?, domain = ?, timezone = ?, currency = ?, dodo_webhook_secret = ? WHERE id = ?')
-    .bind(next.name, next.domain, next.timezone, next.currency, next.dodo_webhook_secret, site.id)
+  for (const key of ['polar_webhook_secret', 'stripe_webhook_secret', 'razorpay_webhook_secret'] as const) {
+    if (typeof b[key] === 'string' && !b[key]!.includes('•')) next[key] = b[key]!.trim() || null;
+  }
+  await c.env.DB.prepare('UPDATE sites SET name = ?, domain = ?, timezone = ?, currency = ?, dodo_webhook_secret = ?, polar_webhook_secret = ?, stripe_webhook_secret = ?, razorpay_webhook_secret = ? WHERE id = ?')
+    .bind(next.name, next.domain, next.timezone, next.currency, next.dodo_webhook_secret, next.polar_webhook_secret, next.stripe_webhook_secret, next.razorpay_webhook_secret, site.id)
     .run();
   forgetSite(site.id);
   return c.json(publicSite(next));

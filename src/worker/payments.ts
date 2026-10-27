@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import type { Db } from '../shared/db';
 import { getSite, type AppEnv, type Site } from './env';
-import { verifyStandardWebhook } from './lib/crypto';
+import { verifyHmacSha256Hex, verifyPolarWebhook, verifyStandardWebhook, verifyStripeSignature } from './lib/crypto';
 
 export function currencyDecimals(currency: string): number {
   try {
@@ -260,6 +260,128 @@ export async function handleDodoWebhook(c: Context<AppEnv>) {
       .run();
   }
   // Every other event type is acknowledged so Dodo doesn't retry it.
+  return c.json({ ok: true });
+}
+
+function asRecord(value: unknown): Record<string, any> {
+  return value && typeof value === 'object' ? value as Record<string, any> : {};
+}
+
+function amountNumber(value: unknown): number {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+async function recordProviderRefund(db: Db, site: Site, provider: string, refundId: string, originalId: string, amount: number, currency: string, ts: number) {
+  const original = await db.prepare('SELECT * FROM payments WHERE site_id = ? AND id = ? AND kind = \'payment\'')
+    .bind(site.id, originalId).first<{ visitor_id: string | null; session_id: string | null; customer_id: string | null; email: string | null; name: string | null }>();
+  await db.prepare(
+    `INSERT OR IGNORE INTO payments (id, site_id, provider, ts, amount, kind, currency, visitor_id, session_id, customer_id, email, name)
+     VALUES (?, ?, ?, ?, ?, 'refund', ?, ?, ?, ?, ?, ?)`,
+  ).bind(`${site.id}:${provider}:${refundId}`, site.id, provider, ts, -Math.abs(amount), currency.toUpperCase(),
+    original?.visitor_id ?? null, original?.session_id ?? null, original?.customer_id ?? null, original?.email ?? null, original?.name ?? null).run();
+}
+
+/** Polar sends Standard Webhooks signatures and an order.paid payload with minor-unit amounts. */
+export async function handlePolarWebhook(c: Context<AppEnv>) {
+  return handleNativeWebhook(c, 'polar');
+}
+
+/** Stripe's signature covers the exact raw body and timestamp from Stripe-Signature. */
+export async function handleStripeWebhook(c: Context<AppEnv>) {
+  return handleNativeWebhook(c, 'stripe');
+}
+
+/** Razorpay signs the raw request body with HMAC-SHA256 and emits minor-unit amounts. */
+export async function handleRazorpayWebhook(c: Context<AppEnv>) {
+  return handleNativeWebhook(c, 'razorpay');
+}
+
+async function handleNativeWebhook(c: Context<AppEnv>, provider: 'polar' | 'stripe' | 'razorpay') {
+  const site = await getSite(c.env.DB, c.req.param('siteId')!);
+  if (!site) return c.json({ error: 'unknown site' }, 404);
+  const secret = provider === 'polar' ? site.polar_webhook_secret : provider === 'stripe' ? site.stripe_webhook_secret : site.razorpay_webhook_secret;
+  if (!secret) return c.json({ error: `${provider} webhook secret is not configured` }, 400);
+  const body = await c.req.text();
+  let valid = false;
+  if (provider === 'polar') {
+    const headers = {
+      id: c.req.header('webhook-id') ?? null, timestamp: c.req.header('webhook-timestamp') ?? null, signature: c.req.header('webhook-signature') ?? null,
+    };
+    // Polar presently signs with the literal secret; also accept the Standard Webhooks key
+    // derivation in case an endpoint/account is using the spec-compliant variant.
+    valid = await verifyPolarWebhook(secret, headers, body) || await verifyStandardWebhook(secret, headers, body);
+  } else if (provider === 'stripe') {
+    valid = await verifyStripeSignature(secret, c.req.header('stripe-signature') ?? null, body);
+  } else {
+    const signature = c.req.header('x-razorpay-signature') ?? '';
+    valid = await verifyHmacSha256Hex(secret, body, signature);
+  }
+  if (!valid) return c.json({ error: 'invalid signature' }, 401);
+
+  let event: Record<string, any>;
+  try { event = JSON.parse(body); } catch { return c.json({ error: 'invalid JSON' }, 400); }
+  const data = provider === 'stripe' ? asRecord(event.data).object : asRecord(event.data);
+  const ts = provider === 'stripe' ? amountNumber(event.created) * 1000 : Date.parse(String(event.timestamp ?? data.created_at ?? '')) || Date.now();
+
+  if (provider === 'polar') {
+    const customer = asRecord(data.customer);
+    const meta = asRecord(data.metadata);
+    const paymentId = str(data.id);
+    if (event.type === 'order.paid' && paymentId) {
+      await recordPayment(c.env.DB, site, {
+        id: `${site.id}:polar:${paymentId}`, provider: 'polar', ts,
+        amount: amountNumber(data.total_amount), kind: 'payment', currency: str(data.currency) ?? site.currency,
+        visitorId: pickMeta(meta, ['kt_visitor_id', 'visitor_id']), sessionId: pickMeta(meta, ['kt_session_id', 'session_id']),
+        customerId: str(data.customer_id) ?? str(customer.id), email: str(customer.email)?.toLowerCase() ?? null,
+        name: str(customer.name) ?? str(data.billing_name), subscriptionId: str(data.subscription_id), renewal: data.billing_reason === 'subscription_cycle',
+      });
+    } else if (event.type === 'refund.updated' && data.status === 'succeeded' && str(data.id) && str(data.order_id)) {
+      await recordProviderRefund(c.env.DB, site, 'polar', String(data.id), `${site.id}:polar:${data.order_id}`,
+        amountNumber(data.amount), str(data.currency) ?? site.currency, ts);
+    }
+  }
+
+  if (provider === 'stripe') {
+    const metadata = asRecord(data.metadata);
+    if (['payment_intent.succeeded', 'checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(String(event.type))) {
+      const isCheckout = String(event.type).startsWith('checkout.session.');
+      if (!isCheckout || data.payment_status === 'paid') {
+        const pi = isCheckout ? str(data.payment_intent) : str(data.id);
+        if (pi) await recordPayment(c.env.DB, site, {
+          id: `${site.id}:stripe:${pi}`, provider: 'stripe', ts,
+          amount: amountNumber(isCheckout ? data.amount_total : (data.amount_received || data.amount)), kind: 'payment',
+          currency: str(data.currency) ?? site.currency,
+          visitorId: pickMeta(metadata, ['kt_visitor_id', 'visitor_id']), sessionId: pickMeta(metadata, ['kt_session_id', 'session_id']),
+          customerId: str(data.customer), email: str(asRecord(data.customer_details).email ?? data.receipt_email)?.toLowerCase() ?? null,
+          name: str(asRecord(data.customer_details).name), subscriptionId: str(data.subscription),
+        });
+      }
+    } else if ((event.type === 'refund.created' || event.type === 'refund.updated') && data.status === 'succeeded') {
+      const pi = str(data.payment_intent);
+      const refundId = str(data.id);
+      if (pi && refundId) await recordProviderRefund(c.env.DB, site, 'stripe', refundId, `${site.id}:stripe:${pi}`,
+        amountNumber(data.amount), str(data.currency) ?? site.currency, ts);
+    }
+  }
+
+  if (provider === 'razorpay') {
+    const payload = asRecord(event.payload);
+    const payment = asRecord(asRecord(payload.payment).entity);
+    const refund = asRecord(asRecord(payload.refund).entity);
+    if (event.event === 'payment.captured' && str(payment.id)) {
+      const notes = asRecord(payment.notes);
+      await recordPayment(c.env.DB, site, {
+        id: `${site.id}:razorpay:${payment.id}`, provider: 'razorpay', ts: amountNumber(payment.created_at) * 1000 || ts,
+        amount: amountNumber(payment.amount), kind: 'payment', currency: str(payment.currency) ?? site.currency,
+        visitorId: pickMeta(notes, ['kt_visitor_id', 'visitor_id']), sessionId: pickMeta(notes, ['kt_session_id', 'session_id']),
+        customerId: str(notes.customer_id) ?? str(payment.customer_id), email: str(payment.email)?.toLowerCase() ?? null, name: str(payment.contact),
+      });
+    } else if (event.event === 'refund.processed' && str(refund.id) && str(refund.payment_id)) {
+      await recordProviderRefund(c.env.DB, site, 'razorpay', String(refund.id), `${site.id}:razorpay:${refund.payment_id}`,
+        amountNumber(refund.amount), str(refund.currency) ?? site.currency, amountNumber(refund.created_at) * 1000 || ts);
+    }
+  }
   return c.json({ ok: true });
 }
 

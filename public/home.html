@@ -256,12 +256,13 @@
             <article class="step">
               <div class="step-top"><span class="step-num">02</span><span class="ficon"><svg class="ico" aria-hidden="true"><use href="#i-credit-card" /></svg></span></div>
               <h3>Connect your payments</h3>
-              <p>Add a webhook or send a small JSON payload. Dodo Payments is native; Stripe and others work through the API.</p>
+              <p>Connect signed webhooks for Dodo, Stripe, Polar and Razorpay, or send normalized events from another billing platform.</p>
               <div class="step-visual">
                 <div class="provider-list">
-                  <div class="provider"><img class="provider-logo" src="https://www.google.com/s2/favicons?domain=dodopayments.com&amp;sz=64" width="25" height="25" alt="" loading="lazy" /><span><b>Dodo Payments</b><small>Native webhook</small></span><span class="provider-state"><svg class="ico" aria-hidden="true"><use href="#i-check" /></svg>Connected</span></div>
-                  <div class="provider"><img class="provider-logo" src="https://www.google.com/s2/favicons?domain=stripe.com&amp;sz=64" width="25" height="25" alt="" loading="lazy" /><span><b>Stripe</b><small>Server-side API</small></span><span class="provider-state muted">Ready</span></div>
-                  <div class="provider"><img class="provider-logo" src="https://www.google.com/s2/favicons?domain=polar.sh&amp;sz=64" width="25" height="25" alt="" loading="lazy" /><span><b>Polar</b><small>Server-side API</small></span><span class="provider-state muted">Ready</span></div>
+                  <div class="provider"><img class="provider-logo" src="https://cdn.simpleicons.org/dodopayments/17130f" width="25" height="25" alt="" loading="lazy" /><span><b>Dodo Payments</b><small>Signed webhook</small></span><span class="provider-state"><svg class="ico" aria-hidden="true"><use href="#i-check" /></svg>Connected</span></div>
+                  <div class="provider"><img class="provider-logo" src="https://cdn.simpleicons.org/stripe/635bff" width="25" height="25" alt="" loading="lazy" /><span><b>Stripe</b><small>Signed webhook</small></span><span class="provider-state muted">Ready</span></div>
+                  <div class="provider"><img class="provider-logo" src="https://polar.sh/favicon.ico" width="25" height="25" alt="" loading="lazy" /><span><b>Polar</b><small>Signed webhook</small></span><span class="provider-state muted">Ready</span></div>
+                  <div class="provider"><img class="provider-logo" src="https://razorpay.com/favicon.ico" width="25" height="25" alt="" loading="lazy" /><span><b>Razorpay</b><small>Signed webhook</small></span><span class="provider-state muted">Ready</span></div>
                 </div>
               </div>
             </article>
@@ -297,7 +298,7 @@
               <li><b>Last non-direct touch.</b> “Saw the tweet, came back 17 days later and paid” is credited to the tweet.</li>
               <li><b>Works without metadata.</b> Return page, customer history, identified email and checkout timing as fallbacks.</li>
               <li><b>Every payment is explained.</b> The Journey tab shows exactly how each one was matched.</li>
-              <li><b>Your payment stack.</b> Dodo Payments built in, plus a generic API for Stripe, Lemon Squeezy, Polar and anything else.</li>
+              <li><b>Your payment stack.</b> Native signed webhooks for Dodo, Stripe, Polar and Razorpay, plus a generic API for other billing platforms.</li>
             </ul>
             <a class="text-link" href="#deploy">Deploy Kestrel <svg class="ico" aria-hidden="true"><use href="#i-arrow-right" /></svg></a>
           </div>
@@ -615,7 +616,7 @@ npm run deploy:cloudflare</code></pre>
           </details>
           <details>
             <summary>Does it work with Stripe?</summary>
-            <p>Yes, through the generic payments API: post a small JSON payload from your webhook with the visitor id, amount and email. Dodo Payments has a native, signature-verified webhook.</p>
+            <p>Yes. Dodo Payments, Stripe, Polar and Razorpay have native signature-verified webhooks. For other platforms, normalize their verified webhook on your server and post the visitor id, amount and email to Kestrel's API.</p>
           </details>
           <details>
             <summary>Can I keep the Cloudflare deployment?</summary>

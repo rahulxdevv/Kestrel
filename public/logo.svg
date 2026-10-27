@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Kestrel">
-  <rect width="64" height="64" rx="16" fill="#17130f" />
-  <path d="M19 15v34M22 32l23-18M22 32l23 18" fill="none" stroke="#f8f6f2" stroke-linecap="round" stroke-linejoin="round" stroke-width="7" />
-  <path d="m29 27 13-10" fill="none" stroke="#dd7045" stroke-linecap="round" stroke-width="3" />
+  <rect width="64" height="64" rx="18" fill="#182b39" />
+  <path d="M12 36.5 25.2 15c1.2-2 3.9-2.4 5.7-.8l4.7 4.1 15.8 1.2-10.1 6.2 7.4 4.4-10.8.2c-3.1 11.2-10.7 18.4-22.8 21.4l4.6-11.2L12 36.5Z" fill="#f5f2e9" />
+  <path d="m36.7 24.3 9.4-1.1-6.8 4.4 5.2 2.4-7.7-.1c-2.5 5.8-6.3 10.1-11.7 13 3.3-5.4 5.5-11.8 6.5-19.1l5.1.5Z" fill="#76c6d5" />
+  <circle cx="34.5" cy="21.4" r="1.55" fill="#182b39" />
 </svg>

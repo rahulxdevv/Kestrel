@@ -39,7 +39,29 @@ export function LinkIcon({ size = 16 }: { size?: number }) {
 
 export function SourceIcon({ source, domain, size }: { source: string | null; domain?: string | null; size?: number }) {
   if (!source || source === 'Direct/None') return <Favicon size={size} />;
+  const brand = SOURCE_BRANDS[source];
+  if (brand) return <SourceBrandIcon key={source} slug={brand.slug} color={brand.color} source={source} domain={domain} size={size ?? 18} />;
   return <Favicon domain={domainForSource(source) ?? domain ?? (source.includes('.') ? source : null)} size={size} />;
+}
+
+const SOURCE_BRANDS: Record<string, { slug: string; color: string }> = {
+  X: { slug: 'x', color: '111111' }, Google: { slug: 'google', color: '4285f4' }, Bing: { slug: 'bing', color: '008373' },
+  DuckDuckGo: { slug: 'duckduckgo', color: 'de5833' }, Yahoo: { slug: 'yahoo', color: '6001d2' }, Yandex: { slug: 'yandex', color: 'fc3f1d' },
+  Baidu: { slug: 'baidu', color: '2932e1' }, Ecosia: { slug: 'ecosia', color: '008009' }, 'Brave Search': { slug: 'brave', color: 'fb542b' },
+  ChatGPT: { slug: 'openai', color: '412991' }, Claude: { slug: 'claude', color: 'd97757' }, Perplexity: { slug: 'perplexity', color: '20808d' },
+  Gemini: { slug: 'googlegemini', color: '8e75b2' }, Copilot: { slug: 'microsoftcopilot', color: '258ffa' }, DeepSeek: { slug: 'deepseek', color: '4d6bfe' }, Grok: { slug: 'x', color: '111111' },
+  YouTube: { slug: 'youtube', color: 'ff0000' }, LinkedIn: { slug: 'linkedin', color: '0a66c2' }, Reddit: { slug: 'reddit', color: 'ff4500' },
+  Facebook: { slug: 'facebook', color: '0866ff' }, Instagram: { slug: 'instagram', color: 'e4405f' }, Threads: { slug: 'threads', color: '111111' },
+  TikTok: { slug: 'tiktok', color: '111111' }, Pinterest: { slug: 'pinterest', color: 'bd081c' }, Bluesky: { slug: 'bluesky', color: '0285ff' },
+  Mastodon: { slug: 'mastodon', color: '6364ff' }, 'Hacker News': { slug: 'ycombinator', color: 'f0652f' }, Medium: { slug: 'medium', color: '111111' },
+  Substack: { slug: 'substack', color: 'ff6719' }, 'Dev.to': { slug: 'devdotto', color: '0a0a0a' }, GitHub: { slug: 'github', color: '181717' },
+  Gmail: { slug: 'gmail', color: 'ea4335' }, Outlook: { slug: 'microsoftoutlook', color: '0078d4' },
+};
+
+function SourceBrandIcon({ slug, color, source, domain, size }: { slug: string; color: string; source: string; domain?: string | null; size: number }) {
+  const [broken, setBroken] = useState(false);
+  if (broken) return <Favicon domain={domainForSource(source) ?? domain ?? null} size={size} />;
+  return <img src={`https://cdn.simpleicons.org/${slug}/${color}`} width={size} height={size} className="shrink-0 object-contain" alt="" loading="lazy" onError={() => setBroken(true)} />;
 }
 
 /** One glyph per acquisition channel, so rows stay legible without a favicon request. */

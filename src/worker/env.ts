@@ -28,6 +28,9 @@ export interface Site {
   currency: string;
   api_key: string;
   dodo_webhook_secret: string | null;
+  polar_webhook_secret: string | null;
+  stripe_webhook_secret: string | null;
+  razorpay_webhook_secret: string | null;
   /** When set, the read-only dashboard is public at /share/<token>. */
   share_token: string | null;
   created_at: number;

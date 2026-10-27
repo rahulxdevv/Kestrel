@@ -37,7 +37,7 @@ Google result next to the money it produced.
 | **AI assistants** | A dedicated channel for ChatGPT, Claude, Gemini, Perplexity, Copilot, DeepSeek and Grok, over time and by assistant |
 | **Live** | Realtime view, draggable 3D globe and 2D world map, sale events with optional chime (press `M` to toggle), pages, sources and devices |
 | **Audience** | Country, region, city, browser, OS, device, hostname, entry and exit pages, outbound links |
-| **Revenue** | Customer journeys with source, amount and time to convert; Dodo webhooks and a provider-tagged API for Lemon Squeezy, Paddle, Gumroad or custom billing |
+| **Revenue** | Customer journeys with source, amount and time to convert; signed webhooks for Dodo, Stripe, Polar and Razorpay, plus an API for Lemon Squeezy, Paddle, Gumroad or custom billing |
 | **Plausible import** | Import daily aggregate CSV history; it stays separate from visitor-level Kestrel records and attribution |
 | **Agents** | MCP server with seven read-only tools, site-scoped API keys, copy-paste config for Claude Code and Cursor |
 | **Languages** | Dashboard navigation, metrics and grids in English, Spanish, German, French, Portuguese, Hindi, Japanese and Chinese |
@@ -191,10 +191,29 @@ missing, Kestrel tries the return page, an earlier payment by the same customer 
 hours before the payment). The Journey view shows how each payment was matched, and **Try matching again**
 re-runs the fallbacks. Refunds are subtracted from revenue.
 
+### Stripe, Polar and Razorpay
+
+Each provider has a native endpoint under `/api/webhooks/{provider}/SITE_ID`. Copy the endpoint shown in
+site settings and save that endpoint's signing secret there. Kestrel verifies the provider signature against
+the original request body before recording any payment. Configure these provider events:
+
+- Stripe: `payment_intent.succeeded`, the Checkout completion events shown in Settings, `refund.created`, and `refund.updated`.
+- Polar: `order.paid` and `refund.updated`.
+- Razorpay: `payment.captured` and `refund.processed`.
+
+Failed, uncaptured, and unsuccessful refund events are ignored.
+Include `kt_visitor_id` and `kt_session_id` in Stripe metadata, Polar order metadata, or Razorpay payment
+notes when your checkout setup permits it. Otherwise, the existing return-page, customer, email, and
+checkout-time matching fallbacks apply.
+
+- [Stripe webhook signature documentation](https://docs.stripe.com/webhooks/signature)
+- [Polar webhook endpoint documentation](https://polar.sh/docs/api-reference/webhooks/endpoints/create)
+- [Razorpay webhook validation documentation](https://razorpay.com/docs/webhooks/validate-test/)
+
 ### Any other provider
 
 Normalize provider webhook events on your server and send them to the generic endpoint. Use the optional
-`provider` field (`lemon_squeezy`, `paddle`, `gumroad`, `stripe`, or your own label). Keep the API key
+`provider` field (`lemon_squeezy`, `paddle`, `gumroad`, or your own label). Keep the API key
 server-side. Visitor and session IDs can be supplied as checkout metadata; if they are absent, Kestrel
 tries a return-page claim, existing customer/email identity, then an unambiguous recent checkout signal.
 

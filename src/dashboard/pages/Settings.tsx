@@ -816,6 +816,27 @@ function RevenuePanel({
         </div>
       </PanelCard>
 
+      <PanelCard
+        title="Native provider webhooks"
+        description="Receive signed payment events directly. Configure the endpoint in each provider dashboard and paste its endpoint signing secret here."
+        icon="pulse"
+      >
+        <div className="space-y-3">
+          <NativeWebhookCard site={site} origin={origin} busy={busy} save={save} provider="polar"
+            label="Polar" events="order.paid, refund.updated" placeholder="polar_whs_…"
+            docs="https://polar.sh/docs/api-reference/webhooks/endpoints/create"
+            instructions="Create a raw format endpoint. Subscribe to paid orders and refund updates." />
+          <NativeWebhookCard site={site} origin={origin} busy={busy} save={save} provider="stripe"
+            label="Stripe" events="checkout.session.completed, checkout.session.async_payment_succeeded, payment_intent.succeeded, refund.created, refund.updated" placeholder="whsec_…"
+            docs="https://docs.stripe.com/webhooks/signature"
+            instructions="Create an endpoint for the events listed above. Use the endpoint signing secret (not an API key)." />
+          <NativeWebhookCard site={site} origin={origin} busy={busy} save={save} provider="razorpay"
+            label="Razorpay" events="payment.captured, refund.processed" placeholder="Webhook secret"
+            docs="https://razorpay.com/docs/webhooks/validate-test/"
+            instructions="Subscribe to captured payments and processed refunds, then use the webhook secret configured for this endpoint." />
+        </div>
+      </PanelCard>
+
       <details className="card group p-5 sm:p-6">
         <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
           <div className="flex gap-3">
@@ -825,7 +846,7 @@ function RevenuePanel({
             <div>
               <h2 className="text-[16px] font-semibold tracking-tight">Another payment provider</h2>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-500">
-                Stripe, Lemon Squeezy, Gumroad, Paddle or your own billing system can send payment events through the server-side API.
+                Lemon Squeezy, Gumroad, Paddle or your own billing system can send normalized events through the server-side API. Dodo, Stripe, Polar and Razorpay have signed native webhooks above.
               </p>
             </div>
           </div>
@@ -846,11 +867,70 @@ function RevenuePanel({
             Normalize the provider webhook in your server and call this endpoint. Pass the visitor ID saved at checkout when available;
             otherwise Kestrel tries a return-page claim, customer/email history, and a unique recent checkout signal. Keep the API key on your server.
           </p>
-          <p className="mt-2 text-xs leading-5 text-stone-500">Set the optional <code className="rounded bg-stone-100 px-1 py-0.5">provider</code> field to <code className="rounded bg-stone-100 px-1 py-0.5">lemon_squeezy</code>, <code className="rounded bg-stone-100 px-1 py-0.5">paddle</code>, <code className="rounded bg-stone-100 px-1 py-0.5">gumroad</code>, <code className="rounded bg-stone-100 px-1 py-0.5">stripe</code> or your own provider name.</p>
+          <p className="mt-2 text-xs leading-5 text-stone-500">Set the optional <code className="rounded bg-stone-100 px-1 py-0.5">provider</code> field to <code className="rounded bg-stone-100 px-1 py-0.5">lemon_squeezy</code>, <code className="rounded bg-stone-100 px-1 py-0.5">paddle</code>, <code className="rounded bg-stone-100 px-1 py-0.5">gumroad</code> or your own provider name.</p>
         </div>
       </details>
     </>
   );
+}
+
+function NativeWebhookCard({
+  site, origin, busy, save, provider, label, events, placeholder, docs, instructions,
+}: {
+  site: Site;
+  origin: string;
+  busy: boolean;
+  save: (patch: Partial<Site>, message?: string) => Promise<void>;
+  provider: 'polar' | 'stripe' | 'razorpay';
+  label: string;
+  events: string;
+  placeholder: string;
+  docs: string;
+  instructions: string;
+}) {
+  const key = `${provider}_webhook_secret` as 'polar_webhook_secret' | 'stripe_webhook_secret' | 'razorpay_webhook_secret';
+  const [secret, setSecret] = useState('');
+  const [replace, setReplace] = useState(false);
+  const connected = Boolean(site[key]);
+  const url = `${origin}/api/webhooks/${provider}/${site.id}`;
+  return (
+    <div className="rounded-xl border border-stone-200 p-3.5 sm:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm font-semibold"><ProviderBrand provider={provider} size={20} />{label}</div>
+        <span className={`rounded-full px-2 py-1 text-[10px] font-medium ${connected ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'}`}>
+          {connected ? 'Connected' : 'Not connected'}
+        </span>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-stone-500">{instructions} Events: <code className="break-all">{events}</code>.</p>
+      <div className="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row">
+        <code className="min-w-0 flex-1 break-all rounded-lg bg-stone-50 px-3 py-2 text-[11px] text-stone-600">{url}</code>
+        <CopyButton text={url} className="btn h-9 shrink-0 py-0 text-xs" />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {connected && !replace ? <>
+          <span className="self-center text-xs text-emerald-700">Signing secret saved securely</span>
+          <button className="btn h-8 py-0 text-xs" onClick={() => setReplace(true)}>Replace secret</button>
+        </> : <>
+          <input className="input min-w-0 flex-1 font-mono text-xs" type="password" autoComplete="new-password" aria-label={`${label} webhook signing secret`}
+            placeholder={placeholder} value={secret} onChange={(event) => setSecret(event.target.value)} />
+          <button className="btn-dark shrink-0" disabled={busy || !secret.trim()} onClick={async () => {
+            await save({ [key]: secret.trim() }, `${label} webhook secret saved`);
+            setSecret(''); setReplace(false);
+          }}>{busy ? 'Saving…' : 'Save secret'}</button>
+          {connected && <button className="btn" onClick={() => { setSecret(''); setReplace(false); }}>Cancel</button>}
+        </>}
+      </div>
+      <a className="mt-3 inline-flex text-xs font-medium text-stone-500 underline-offset-2 hover:text-ink hover:underline" href={docs} target="_blank" rel="noreferrer">Official {label} webhook docs ↗</a>
+    </div>
+  );
+}
+
+function ProviderBrand({ provider, size = 20 }: { provider: 'polar' | 'stripe' | 'razorpay' | 'dodo'; size?: number }) {
+  const src = {
+    polar: 'https://polar.sh/favicon.ico', stripe: 'https://cdn.simpleicons.org/stripe/635bff',
+    razorpay: 'https://razorpay.com/favicon.ico', dodo: 'https://cdn.simpleicons.org/dodopayments/17130f',
+  }[provider];
+  return <img src={src} width={size} height={size} className="shrink-0 rounded object-contain" alt="" loading="lazy" />;
 }
 
 function SharingPanel({

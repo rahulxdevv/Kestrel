@@ -23,6 +23,26 @@ async function hmac(key: Uint8Array<ArrayBuffer>, data: string): Promise<ArrayBu
   return crypto.subtle.sign('HMAC', k, enc.encode(data));
 }
 
+/** Verify an HMAC-SHA256 signature encoded as lowercase or uppercase hex. */
+export async function verifyHmacSha256Hex(secret: string, message: string, signature: string): Promise<boolean> {
+  if (!/^[a-f0-9]{64}$/i.test(signature)) return false;
+  const digest = await hmac(enc.encode(secret), message);
+  const expected = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return safeEqual(expected, signature.toLowerCase());
+}
+
+export async function verifyStripeSignature(secret: string, header: string | null, body: string, now = Date.now()): Promise<boolean> {
+  if (!header) return false;
+  const parts = header.split(',').map((part) => part.split('='));
+  const timestamp = parts.find(([key]) => key === 't')?.[1];
+  const signatures = parts.filter(([key]) => key === 'v1').map(([, value]) => value);
+  const seconds = Number(timestamp);
+  if (!Number.isFinite(seconds) || Math.abs(now / 1000 - seconds) > 5 * 60) return false;
+  const digest = await hmac(enc.encode(secret), `${timestamp}.${body}`);
+  const expected = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return signatures.some((signature) => safeEqual(signature.toLowerCase(), expected));
+}
+
 function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let r = 0;
@@ -46,7 +66,8 @@ export async function verifyStandardWebhook(
   if (!Number.isFinite(ts) || Math.abs(now / 1000 - ts) > 5 * 60) return false;
   let key: Uint8Array<ArrayBuffer>;
   try {
-    key = b64ToBytes(secret.startsWith('whsec_') ? secret.slice(6) : secret);
+    const encoded = secret.startsWith('whsec_') ? secret.slice(6) : secret.startsWith('polar_whs_') ? secret.slice(10) : secret;
+    key = b64ToBytes(encoded.replace(/-/g, '+').replace(/_/g, '/'));
   } catch {
     return false;
   }
@@ -55,6 +76,21 @@ export async function verifyStandardWebhook(
     .split(' ')
     .map((s) => s.split(',')[1] ?? '')
     .some((sig) => safeEqual(sig, expected));
+}
+
+/** Polar currently signs with the literal endpoint secret bytes, including its polar_whs_ prefix. */
+export async function verifyPolarWebhook(
+  secret: string,
+  headers: { id: string | null; timestamp: string | null; signature: string | null },
+  body: string,
+  now = Date.now(),
+): Promise<boolean> {
+  const { id, timestamp, signature } = headers;
+  if (!id || !timestamp || !signature) return false;
+  const ts = Number(timestamp);
+  if (!Number.isFinite(ts) || Math.abs(now / 1000 - ts) > 5 * 60) return false;
+  const expected = bytesToB64(await hmac(enc.encode(secret), `${id}.${timestamp}.${body}`));
+  return signature.split(' ').map((part) => part.split(',')[1] ?? '').some((candidate) => safeEqual(candidate, expected));
 }
 
 /** Sign a value for the dashboard login cookie. */

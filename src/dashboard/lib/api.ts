@@ -30,6 +30,9 @@ export interface Site {
   currency: string;
   api_key: string;
   dodo_webhook_secret: string | null;
+  polar_webhook_secret: string | null;
+  stripe_webhook_secret: string | null;
+  razorpay_webhook_secret: string | null;
   share_token: string | null;
   created_at: number;
   visitors24h?: number;
