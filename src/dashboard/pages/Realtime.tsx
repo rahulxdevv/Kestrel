@@ -22,11 +22,19 @@ function RealtimeBody() {
   const { t } = useT();
   const [auto, setAuto] = useState(true);
   const [view, setView] = useState<'globe' | 'flat'>('globe');
+  const [mapFullscreen, setMapFullscreen] = useState(false);
+  const mapFrame = useRef<HTMLDivElement>(null);
   const [sound, setSound] = useState(() => localStorage.getItem('kestrel:sale-sound') === 'on');
   const seenSales = useRef<Set<string> | null>(null);
   const latestServerTime = useRef(Date.now());
   const [saleAfter, setSaleAfter] = useState(() => Date.now() - 1000);
   const { data, loading } = useApi<LiveData>(`${apiBase}/realtime?${qs(q, { after: saleAfter })}`, reloadKey);
+
+  useEffect(() => {
+    const syncFullscreen = () => setMapFullscreen(document.fullscreenElement === mapFrame.current);
+    document.addEventListener('fullscreenchange', syncFullscreen);
+    return () => document.removeEventListener('fullscreenchange', syncFullscreen);
+  }, []);
 
   useEffect(() => {
     if (!auto) return;
@@ -42,14 +50,15 @@ function RealtimeBody() {
 
   useEffect(() => {
     if (!data) return;
-    const lastReturnedSale = data.sales[data.sales.length - 1]?.ts;
+    const saleRows = Array.isArray(data.sales) ? data.sales : [];
+    const lastReturnedSale = saleRows[saleRows.length - 1]?.ts;
     // If the safety cap is reached, keep polling from the oldest unprocessed
     // point in the ordered result set so a busy site cannot skip sales.
-    const nextCursor = data.sales.length >= 1000 && lastReturnedSale
+    const nextCursor = saleRows.length >= 1000 && lastReturnedSale
       ? Math.max(0, lastReturnedSale - 1)
       : data.serverTime;
     latestServerTime.current = Math.max(latestServerTime.current, nextCursor);
-    const ids = data.sales.map((item) => item.sale_id ?? `${item.ts}-${item.visitor_id}`);
+    const ids = saleRows.map((item) => item.sale_id ?? `${item.ts}-${item.visitor_id}`);
     if (!seenSales.current) seenSales.current = new Set();
     const unseen = ids.filter((id) => !seenSales.current!.has(id));
     ids.forEach((id) => seenSales.current!.add(id));
@@ -122,8 +131,18 @@ function RealtimeBody() {
           </div>
         </div>
 
-        <div className="relative bg-[#070d18]">
-          <WorldMap points={points} mode={view} height={440} />
+        <div ref={mapFrame} className="kestrel-map-fullscreen relative bg-[#070d18]">
+          <WorldMap points={points} mode={view} height={mapFullscreen ? window.innerHeight : 440} />
+
+          {view === 'globe' && <button className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-slate-950/70 text-white transition hover:bg-slate-900"
+            aria-label={mapFullscreen ? 'Exit fullscreen map' : 'View map fullscreen'} title={mapFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            onClick={async () => {
+              if (!mapFrame.current) return;
+              if (document.fullscreenElement) await document.exitFullscreen();
+              else await mapFrame.current.requestFullscreen?.();
+            }}>
+            <Icon name="maximize" size={16} />
+          </button>}
 
           {/* The same summary DataFast puts on the map, but built from our own numbers. */}
           <div className="pointer-events-none absolute left-3 top-3 w-[248px] rounded-xl border border-white/15 bg-white/95 p-3 text-ink shadow-lg backdrop-blur-sm sm:left-4 sm:top-4">
@@ -179,16 +198,16 @@ function RealtimeBody() {
         <div className="border-t border-stone-100 px-5 py-3">
           <div className="mb-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-stone-400">
             <span>{t('realtime.activity')} · last 30 minutes</span>
-            <span>{data ? `${data.activity.length} events` : ''}</span>
+            <span>{data ? `${Array.isArray(data.activity) ? data.activity.length : 0} events` : ''}</span>
           </div>
           {!data && <div className="h-52 animate-pulse rounded-xl bg-stone-50" />}
-          {data && data.activity.length === 0 && (
+          {data && (!Array.isArray(data.activity) || data.activity.length === 0) && (
             <p className="py-12 text-center text-sm text-stone-400">
               Quiet right now. As soon as someone opens {site.domain}, they show up here.
             </p>
           )}
           <ol className="divide-y divide-stone-100">
-            {data?.activity.map((e, i) => (
+            {(Array.isArray(data?.activity) ? data.activity : []).map((e, i) => (
               <li key={e.sale_id ?? `${e.ts}-${i}`} className={`flex items-center gap-3 py-2.5 ${e.type === 'sale' ? 'rounded-lg bg-amber-50/70 px-2' : ''}`}>
                 <span className="w-11 shrink-0 text-[11px] tabular-nums text-stone-400">{time(e.ts)}</span>
                 <span className="flex w-7 shrink-0 justify-center">

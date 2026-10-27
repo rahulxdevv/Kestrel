@@ -24,22 +24,14 @@ export interface MapCanvasProps {
 }
 
 /** A marker: an illustrated face for a place with a city, the country's flag for a country dot. */
-function markerElement(point: LivePoint, mode: 'globe' | 'flat'): HTMLElement {
+function markerElement(point: LivePoint): HTMLElement {
   const el = document.createElement('div');
-  const useFlag = mode === 'flat' && !point.city;
-  el.className = useFlag ? 'kl-chip kl-chip-flag' : 'kl-chip kl-chip-face';
+  el.className = 'kl-chip kl-chip-face';
   const label = `${point.city ? `${point.city}, ` : ''}${countryName(point.country)}`;
   el.title = `${label} · ${point.visitors} ${point.visitors === 1 ? 'visitor' : 'visitors'}`;
   const count =
     point.visitors > 1 ? `<span class="kl-chip-count">+${point.visitors}</span>` : '';
-  if (useFlag) {
-    const code = point.country.toLowerCase();
-    el.innerHTML =
-      `<span class="kl-chip-pic"><img src="https://flagcdn.com/w40/${code}.png" width="22" height="15" alt="" ` +
-      `onerror="this.replaceWith(document.createTextNode(''))"></span>${count}`;
-  } else {
-    el.innerHTML = `<span class="kl-chip-pic">${avatarMarkup(point.visitorId ?? point.city ?? point.country, 30)}</span>${count}`;
-  }
+  el.innerHTML = `<span class="kl-chip-pic">${avatarMarkup(point.visitorId ?? point.city ?? point.country, 30)}</span>${count}`;
   return el;
 }
 
@@ -72,6 +64,9 @@ export default function MapCanvas({ points, mode, height, onFail }: MapCanvasPro
       return;
     }
     mapRef.current = map;
+
+    const onFullscreenChange = () => window.requestAnimationFrame(() => map.resize());
+    document.addEventListener('fullscreenchange', onFullscreenChange);
 
     let loaded = false;
     let errors = 0;
@@ -113,6 +108,7 @@ export default function MapCanvas({ points, mode, height, onFail }: MapCanvasPro
     return () => {
       cancelAnimationFrame(raf);
       window.clearTimeout(giveUp);
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
       map.off('load', onLoad);
       map.off('error', onError);
       for (const marker of markersRef.current) marker.remove();
@@ -128,9 +124,22 @@ export default function MapCanvas({ points, mode, height, onFail }: MapCanvasPro
     const map = mapRef.current;
     if (!map) return;
     for (const marker of markersRef.current) marker.remove();
+    const totals = new Map<string, number>();
+    for (const point of points) {
+      const key = `${point.lat.toFixed(5)},${point.lon.toFixed(5)}`;
+      totals.set(key, (totals.get(key) ?? 0) + 1);
+    }
+    const indexes = new Map<string, number>();
     markersRef.current = points.map((point) => {
-      const el = markerElement(point, mode);
-      return new Marker({ element: el, anchor: 'center' }).setLngLat([point.lon, point.lat]).addTo(map);
+      const key = `${point.lat.toFixed(5)},${point.lon.toFixed(5)}`;
+      const index = indexes.get(key) ?? 0;
+      indexes.set(key, index + 1);
+      const total = totals.get(key) ?? 1;
+      const angle = index * 2.399963;
+      const radius = total > 1 ? Math.min(48, 18 + Math.sqrt(index) * 8) : 0;
+      const offset: [number, number] = [Math.cos(angle) * radius, Math.sin(angle) * radius];
+      const el = markerElement(point);
+      return new Marker({ element: el, anchor: 'center', offset }).setLngLat([point.lon, point.lat]).addTo(map);
     });
     return () => {
       for (const marker of markersRef.current) marker.remove();

@@ -12,6 +12,9 @@ body { font-feature-settings: 'tnum' 1; -webkit-font-smoothing: antialiased; }
 
 /* World map (MapLibre): markers, chips and the loading state. */
 .kl-map { width: 100%; position: relative; }
+.kestrel-map-fullscreen:fullscreen { width: 100vw; height: 100vh; overflow: hidden; }
+.kestrel-map-fullscreen:fullscreen .kl-map,
+.kestrel-map-fullscreen:fullscreen canvas { height: 100vh !important; }
 .kl-map-skeleton { width: 100%; background: #0b1626; border-radius: 0; }
 .kl-map .maplibregl-ctrl-attrib { font-size: 10px; opacity: 0.85; }
 .kl-chip { display: flex; align-items: center; gap: 4px; cursor: default; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35)); }

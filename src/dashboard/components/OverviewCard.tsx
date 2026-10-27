@@ -17,7 +17,8 @@ export function OverviewCard({ data }: { data: Overview | null }) {
   const [noteLabel, setNoteLabel] = useState('');
   const [noteError, setNoteError] = useState('');
   const notesUrl = !readOnly ? `${apiBase}/notes?${qs(q)}` : null;
-  const { data: notes } = useApi<{ id: string; ts: number; label: string; bucket: string }[]>(notesUrl, reloadKey + noteReload);
+  const { data: notesValue } = useApi<{ id: string; ts: number; label: string; bucket: string }[] | { results?: { id: string; ts: number; label: string; bucket: string }[] }>(notesUrl, reloadKey + noteReload);
+  const notes = Array.isArray(notesValue) ? notesValue : Array.isArray(notesValue?.results) ? notesValue.results : [];
   const current = data?.current;
   const previous = data?.previous;
   const granularity = data?.range.granularity ?? 'day';

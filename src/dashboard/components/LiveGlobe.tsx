@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { countryPoints } from '../../shared/geo';
 import { LAND } from '../../shared/world';
 import type { LivePoint } from '../lib/api';
+import { avatarMarkup } from './Icons';
 
 /**
  * A globe and a flat world map, drawn on canvas with no mapping service, no API token and no
@@ -105,6 +106,16 @@ export function LiveGlobe({ points, height = 430 }: { points: LivePoint[]; heigh
     let width = 0;
     let raf = 0;
     const buffers = new Map<number, { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; image: ImageData }>();
+    const avatarImages = new Map<string, HTMLImageElement>();
+    const avatarImage = (id: string) => {
+      let image = avatarImages.get(id);
+      if (!image) {
+        image = new Image();
+        image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(avatarMarkup(id, 64))}`;
+        avatarImages.set(id, image);
+      }
+      return image;
+    };
 
     const resize = () => {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -261,11 +272,24 @@ export function LiveGlobe({ points, height = 430 }: { points: LivePoint[]; heigh
 
     const drawMarkers = (cx: number, cy: number, radius: number, time: number, list: LivePoint[]) => {
       const markers: Marker[] = list.map((p) => ({ ...p, color: palette[hash(p.country + (p.city ?? '')) % palette.length] }));
+      const totals = new Map<string, number>();
       for (const marker of markers) {
+        const key = `${marker.lat.toFixed(5)},${marker.lon.toFixed(5)}`;
+        totals.set(key, (totals.get(key) ?? 0) + 1);
+      }
+      const indexes = new Map<string, number>();
+      for (const marker of markers) {
+        const key = `${marker.lat.toFixed(5)},${marker.lon.toFixed(5)}`;
+        const index = indexes.get(key) ?? 0;
+        indexes.set(key, index + 1);
         const p = project(marker.lat, marker.lon, radius, cx, cy);
         if (p.z <= 0.06) continue;
+        const angle = index * 2.399963;
+        const spread = (totals.get(key) ?? 1) > 1 ? Math.min(32, 12 + Math.sqrt(index) * 5) : 0;
+        p.x += Math.cos(angle) * spread;
+        p.y += Math.sin(angle) * spread;
         const scale = 0.72 + p.z * 0.36;
-        const r = 10.5 * scale;
+        const r = 13 * scale;
         const alpha = 0.55 + p.z * 0.45;
 
         const halo = ctx.createRadialGradient(p.x, p.y, r * 0.6, p.x, p.y, r * 3.6);
@@ -289,14 +313,24 @@ export function LiveGlobe({ points, height = 430 }: { points: LivePoint[]; heigh
         ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
         ctx.fillStyle = marker.color;
         ctx.fill();
+        const portrait = avatarImage(marker.visitorId ?? `${marker.country}:${marker.city ?? ''}`);
+        if (portrait.complete && portrait.naturalWidth) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, r - 1, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(portrait, p.x - r, p.y - r, r * 2, r * 2);
+          ctx.restore();
+        } else {
+          ctx.fillStyle = '#fff';
+          ctx.font = `700 ${Math.round(8 * scale)}px ui-sans-serif, system-ui, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(marker.country.slice(0, 2), p.x, p.y + 0.5);
+        }
         ctx.lineWidth = 2;
         ctx.strokeStyle = 'rgba(255,255,255,0.92)';
         ctx.stroke();
-        ctx.fillStyle = '#fff';
-        ctx.font = `700 ${Math.round(8 * scale)}px ui-sans-serif, system-ui, sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(marker.country.slice(0, 2), p.x, p.y + 0.5);
 
         if (marker.visitors > 1) {
           const label = `+${marker.visitors}`;

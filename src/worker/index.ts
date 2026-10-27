@@ -381,8 +381,9 @@ app.get('/api/sites/:id/insights/purchase-journey', async (c) => {
 app.get('/api/sites/:id/notes', async (c) => {
   const ctx = makeCtx(c);
   const bucket = bucketSql('ts', ctx.range.granularity, ctx.offset);
-  return c.json(await c.env.DB.prepare(`SELECT id, ts, label, ${bucket} AS bucket FROM chart_notes WHERE site_id = ? AND ts >= ? AND ts < ? ORDER BY ts`)
-    .bind(ctx.site.id, ctx.range.from, ctx.range.to).all());
+  const rows = await c.env.DB.prepare(`SELECT id, ts, label, ${bucket} AS bucket FROM chart_notes WHERE site_id = ? AND ts >= ? AND ts < ? ORDER BY ts`)
+    .bind(ctx.site.id, ctx.range.from, ctx.range.to).all();
+  return c.json(rows.results);
 });
 app.post('/api/sites/:id/notes', async (c) => {
   const body = await c.req.json<{ ts?: number; label?: string }>().catch((): { ts?: number; label?: string } => ({}));

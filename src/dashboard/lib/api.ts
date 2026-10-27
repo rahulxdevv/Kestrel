@@ -78,7 +78,7 @@ export interface LivePoint {
   country: string;
   city: string | null;
   visitors: number;
-  /** One real visitor from that place, so the marker carries their profile picture. */
+  /** Stable visitor ID used to give each map marker its own local profile portrait. */
   visitorId?: string;
 }
 

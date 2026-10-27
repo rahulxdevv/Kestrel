@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from 'react';
+import { createAvatar } from '@dicebear/core';
+import * as lorelei from '@dicebear/lorelei';
 import { domainForSource } from '../../shared/sources';
 import { Icon } from './NavIcons';
 
 export function Favicon({ domain, size = 18, fallback }: { domain?: string | null; size?: number; fallback?: ReactNode }) {
-  const [broken, setBroken] = useState(false);
-  if (!domain || broken) {
+  if (!domain) {
     return (
       <span
         className="inline-flex shrink-0 items-center justify-center rounded text-stone-400"
@@ -15,17 +16,12 @@ export function Favicon({ domain, size = 18, fallback }: { domain?: string | nul
       </span>
     );
   }
-  return (
-    <img
-      src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`}
-      width={size}
-      height={size}
-      className="shrink-0 rounded"
-      alt=""
-      loading="lazy"
-      onError={() => setBroken(true)}
-    />
-  );
+  const host = domain.split('/')[0].replace(/^www\./, '');
+  const label = (host.split('.')[0] || host).slice(0, 1).toUpperCase();
+  const hash = [...host].reduce((value, character) => value * 31 + character.charCodeAt(0), 0) >>> 0;
+  const colors = [['#e8f1fb', '#2862a8'], ['#e9f4ed', '#2c7650'], ['#f8eee6', '#a75b35'], ['#f0ebf8', '#7254a2'], ['#fff4dc', '#956b17']];
+  const [background, foreground] = colors[hash % colors.length];
+  return <span className="inline-flex shrink-0 items-center justify-center rounded-md font-semibold" style={{ width: size, height: size, backgroundColor: background, color: foreground, fontSize: Math.max(9, Math.round(size * 0.62)) }} aria-hidden="true">{label}</span>;
 }
 
 export function LinkIcon({ size = 16 }: { size?: number }) {
@@ -117,12 +113,25 @@ const OS_DOMAINS: Record<string, string> = {
 };
 
 export function BrowserIcon({ name, size }: { name: string | null; size?: number }) {
-  return <Favicon domain={name ? BROWSER_DOMAINS[name] : null} size={size} fallback={<Icon name="browser" size={size ?? 18} />} />;
+  const brand = name ? BROWSER_BRANDS[name] : null;
+  return brand ? <SourceBrandIcon slug={brand.slug} color={brand.color} source={name!} size={size ?? 18} /> : <Favicon domain={name ? BROWSER_DOMAINS[name] : null} size={size} fallback={<Icon name="browser" size={size ?? 18} />} />;
 }
 
 export function OSIcon({ name, size }: { name: string | null; size?: number }) {
-  return <Favicon domain={name ? OS_DOMAINS[name] : null} size={size} fallback={<Icon name="cpu" size={size ?? 18} />} />;
+  const brand = name ? OS_BRANDS[name] : null;
+  return brand ? <SourceBrandIcon slug={brand.slug} color={brand.color} source={name!} size={size ?? 18} /> : <Favicon domain={name ? OS_DOMAINS[name] : null} size={size} fallback={<Icon name="cpu" size={size ?? 18} />} />;
 }
+
+const BROWSER_BRANDS: Record<string, { slug: string; color: string }> = {
+  Chrome: { slug: 'googlechrome', color: '4285f4' }, Firefox: { slug: 'firefox', color: 'ff7139' }, Edge: { slug: 'microsoftedge', color: '0c8ce9' },
+  Opera: { slug: 'opera', color: 'ff1b2d' }, Brave: { slug: 'brave', color: 'fb542b' }, Safari: { slug: 'safari', color: '006cff' },
+  'Mobile Safari': { slug: 'safari', color: '006cff' }, 'Chrome WebView': { slug: 'googlechrome', color: '4285f4' },
+  'Samsung Internet': { slug: 'samsunginternet', color: '1428a0' }, Arc: { slug: 'arc', color: 'fc4f5b' }, Vivaldi: { slug: 'vivaldi', color: 'ef3939' },
+};
+const OS_BRANDS: Record<string, { slug: string; color: string }> = {
+  'Mac OS': { slug: 'macos', color: '111111' }, iOS: { slug: 'ios', color: '111111' }, iPadOS: { slug: 'ipados', color: '111111' },
+  Windows: { slug: 'windows11', color: '0078d4' }, Android: { slug: 'android', color: '3ddc84' }, Linux: { slug: 'linux', color: 'fcc624' },
+};
 
 const DEVICE_ICON: Record<string, string> = { Mobile: 'smartphone', Tablet: 'tablet', Desktop: 'monitor' };
 
@@ -303,19 +312,20 @@ export function avatarInner(id: string): string {
 /** The illustrated profile picture every visitor keeps across the dashboard. */
 export function Avatar({ id, size = 40, className = '' }: { id: string; size?: number; className?: string }) {
   return (
-    <svg
-      viewBox="0 0 64 64"
-      width={size}
-      height={size}
-      className={`shrink-0 ${className}`}
-      role="img"
-      aria-hidden="true"
-      dangerouslySetInnerHTML={{ __html: avatarInner(id) }}
-    />
+    <span className={`block shrink-0 overflow-hidden rounded-full ${className}`} style={{ width: size, height: size }}
+      role="img" aria-label="Visitor profile" dangerouslySetInnerHTML={{ __html: profileSvg(id, size) }} />
   );
 }
 
 /** Same face as a plain HTML string, for map marker elements that are not React. */
 export function avatarMarkup(id: string, size: number): string {
-  return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">${avatarInner(id)}</svg>`;
+  return profileSvg(id, size);
+}
+
+function profileSvg(id: string, size: number): string {
+  const backgrounds = ['dbeafe', 'dcfce7', 'fef3c7', 'fce7f3', 'ede9fe', 'cffafe', 'ffedd5'];
+  return createAvatar(lorelei, {
+    seed: id || 'anonymous-visitor', size, radius: 18, backgroundType: ['solid'],
+    backgroundColor: [backgrounds[hashId(id || 'anonymous-visitor') % backgrounds.length]],
+  }).toString();
 }

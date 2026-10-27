@@ -486,7 +486,7 @@ async function demoRealtime(ctx: Ctx, now: number) {
   const countries = new Map<string | null, number>();
   const devices = new Map<string | null, number>();
   const pages = new Map<string, { visitors: Set<string>; views: number }>();
-  const places = new Map<string, { country: string; city: string | null; visitors: number; visitorId: string }>();
+  const places: { country: string; city: string | null; visitorId: string }[] = [];
   const activity: {
     ts: number;
     type: 'pageview' | 'goal' | 'outbound' | 'sale';
@@ -512,11 +512,8 @@ async function demoRealtime(ctx: Ctx, now: number) {
     if (sample.country) countries.set(sample.country, (countries.get(sample.country) ?? 0) + 1);
     if (sample.device) devices.set(sample.device, (devices.get(sample.device) ?? 0) + 1);
 
-    const placeKey = `${sample.country ?? ''}:${sample.city ?? ''}`;
     if (sample.country) {
-      const place = places.get(placeKey);
-      if (place) place.visitors++;
-      else places.set(placeKey, { country: sample.country, city: sample.city, visitors: 1, visitorId });
+      places.push({ country: sample.country, city: sample.city, visitorId });
     }
 
     const paths = [sample.entry_page, sample.exit_page, '/pricing', '/docs'].filter((p): p is string => Boolean(p));
@@ -561,9 +558,9 @@ async function demoRealtime(ctx: Ctx, now: number) {
     });
   }
 
-  const points = [...places.values()].flatMap((place) => {
+  const points = places.flatMap((place) => {
     const point = geoPoint(place.country, place.city);
-    return point ? [{ ...point, ...place }] : [];
+    return point ? [{ ...point, ...place, visitors: 1 }] : [];
   });
   const rows = (counts: Map<string | null, number>) => [...counts.entries()]
     .map(([label, visitors]) => ({ label, visitors }))
@@ -625,10 +622,13 @@ export async function realtime(ctx: Ctx, simulate = false, after = 0) {
       .bind(id, since),
     ctx.db
       .prepare(
-        `SELECT country, city, COUNT(DISTINCT visitor_id) AS visitors, MAX(visitor_id) AS visitor_id
-         FROM sessions
-         WHERE site_id = ? AND started_at >= ? AND country IS NOT NULL
-         GROUP BY country, city ORDER BY visitors DESC LIMIT 40`,
+        `WITH recent_visits AS (
+           SELECT country, city, visitor_id, started_at,
+                  ROW_NUMBER() OVER (PARTITION BY visitor_id ORDER BY started_at DESC, id DESC) AS visit_rank
+           FROM sessions WHERE site_id = ? AND started_at >= ? AND country IS NOT NULL
+         )
+         SELECT country, city, visitor_id, started_at FROM recent_visits
+         WHERE visit_rank = 1 ORDER BY started_at DESC LIMIT 40`,
       )
       .bind(id, since),
     ctx.db
@@ -656,11 +656,11 @@ export async function realtime(ctx: Ctx, simulate = false, after = 0) {
   ]);
 
   // Coordinates for the globe. A place we cannot place still counts in `countries`, it just has no dot.
-  const points = (places.results as { country: string; city: string | null; visitors: number; visitor_id: string }[])
+  const points = (places.results as { country: string; city: string | null; visitor_id: string }[])
     .map((p) => {
       const point = geoPoint(p.country, p.city);
       return point
-        ? { ...point, country: p.country, city: p.city, visitors: p.visitors, visitorId: p.visitor_id }
+        ? { ...point, country: p.country, city: p.city, visitors: 1, visitorId: p.visitor_id }
         : null;
     })
     .filter(Boolean);

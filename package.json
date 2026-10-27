@@ -35,6 +35,8 @@
     "docker:run": "docker run --rm -p 3000:3000 -v kestrel-data:/data -e ADMIN_PASSWORD=change-me -e SESSION_SECRET=$(openssl rand -hex 32) kestrel"
   },
   "dependencies": {
+    "@dicebear/core": "^9.4.3",
+    "@dicebear/lorelei": "^9.4.2",
     "@hono/node-server": "^1.19.6",
     "hono": "^4.13.13",
     "maplibre-gl": "^6.16.0"
