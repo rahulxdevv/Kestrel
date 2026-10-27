@@ -2,8 +2,9 @@ import { useState, type ReactNode } from 'react';
 import { createAvatar } from '@dicebear/core';
 import * as lorelei from '@dicebear/lorelei';
 import {
-  siAndroid, siArc, siBrave, siFirefoxbrowser, siGooglechrome, siIos, siLinux,
-  siMacos, siOpera, siSafari, siVivaldi,
+  siAndroid, siArc, siBrave, siFirefoxbrowser, siGoogle, siGooglechrome, siGithub,
+  siInstagram, siIos, siLinux, siMacos, siOpera, siReddit, siSafari, siVivaldi,
+  siX, siYoutube,
 } from 'simple-icons';
 import { domainForSource } from '../../shared/sources';
 import { Icon } from './NavIcons';
@@ -39,6 +40,8 @@ export function LinkIcon({ size = 16 }: { size?: number }) {
 
 export function SourceIcon({ source, domain, size }: { source: string | null; domain?: string | null; size?: number }) {
   if (!source || source === 'Direct/None') return <Favicon size={size} />;
+  const local = LOCAL_SOURCE_ICONS[source];
+  if (local) return <LocalBrandIcon icon={local} size={size ?? 18} />;
   const brand = SOURCE_BRANDS[source];
   if (brand) return <SourceBrandIcon key={source} slug={brand.slug} color={brand.color} source={source} domain={domain} size={size ?? 18} />;
   return <Favicon domain={domainForSource(source) ?? domain ?? (source.includes('.') ? source : null)} size={size} />;
@@ -75,11 +78,11 @@ const CHANNEL_ICON: Record<string, string> = {
   Paid: 'creditCard',
 };
 
-export function ChannelIcon({ channel }: { channel: string | null }) {
+export function ChannelIcon({ channel, size = 17 }: { channel: string | null; size?: number }) {
   const name = CHANNEL_ICON[channel ?? ''] ?? 'globe';
   return (
     <span className="inline-flex shrink-0 items-center justify-center text-stone-500" aria-hidden="true">
-      <Icon name={name} size={17} />
+      <Icon name={name} size={size} />
     </span>
   );
 }
@@ -105,6 +108,10 @@ function WindowsMark({ size }: { size: number }) {
 }
 
 type LocalBrand = { path: string; hex: string; title: string };
+const LOCAL_SOURCE_ICONS: Record<string, LocalBrand> = {
+  X: siX, Google: siGoogle, GitHub: siGithub, Instagram: siInstagram,
+  Reddit: siReddit, YouTube: siYoutube,
+};
 const LOCAL_BROWSER_ICONS: Record<string, LocalBrand> = {
   Chrome: siGooglechrome, 'Chrome WebView': siGooglechrome, Firefox: siFirefoxbrowser,
   'Mobile Safari': siSafari, Safari: siSafari, Opera: siOpera, Brave: siBrave,

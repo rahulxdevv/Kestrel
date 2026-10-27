@@ -5,7 +5,7 @@ import { fmtNumber } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { navigate } from '../lib/router';
 import { useApi } from '../lib/useApi';
-import { Favicon } from './Icons';
+import { ChannelIcon, Favicon, SourceIcon } from './Icons';
 import { Icon } from './NavIcons';
 
 /** The label a visitor would recognise: the post name, the campaign, or the landing page. */
@@ -29,7 +29,10 @@ function hostOf(url: string | null): string | null {
 
 export function ContentIcon({ row, size = 18 }: { row: ContentRow; size?: number }) {
   const domain = domainForSource(row.source ?? '') ?? hostOf(row.url) ?? (row.source?.includes('.') ? row.source : null);
-  return <Favicon domain={domain} size={size} />;
+  if (row.source && row.source !== 'Direct/None') return <SourceIcon source={row.source} domain={domain} size={size} />;
+  if (row.channel) return <ChannelIcon channel={row.channel} size={size} />;
+  if (domain) return <Favicon domain={domain} size={size} />;
+  return <span className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md bg-stone-100 text-stone-500"><Icon name={row.content || row.campaign ? 'tag' : 'file'} size={12} /></span>;
 }
 
 export function ContentPanel({ mode = 'overview' }: { mode?: 'overview' | 'full' }) {

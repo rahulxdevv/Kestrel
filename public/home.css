@@ -995,6 +995,12 @@ code {
   font-weight: 700;
 }
 
+.mock-source svg {
+  width: 11px;
+  height: 11px;
+  display: block;
+}
+
 .mock-source.x {
   background: #f2f0ec;
   color: var(--ink);
@@ -1304,6 +1310,12 @@ code {
   border-radius: 5px;
 }
 
+.provider-logo.polar-logo {
+  padding: 3px;
+  border-radius: 7px;
+  background: #f0efff;
+}
+
 .provider > span:nth-child(2) {
   display: flex;
   flex: 1;
@@ -1502,18 +1514,15 @@ code {
 }
 
 .avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 32px;
   height: 32px;
   flex: none;
   border-radius: 50%;
+  border: 2px solid #fff;
+  object-fit: cover;
   background: #eee8de;
-  color: rgba(23, 19, 15, 0.72);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  box-shadow: 0 1px 3px rgba(23, 19, 15, 0.12);
 }
 
 .journey-who {
