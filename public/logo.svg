@@ -1,6 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Kestrel">
-  <rect width="64" height="64" rx="18" fill="#182b39" />
-  <path d="M12 36.5 25.2 15c1.2-2 3.9-2.4 5.7-.8l4.7 4.1 15.8 1.2-10.1 6.2 7.4 4.4-10.8.2c-3.1 11.2-10.7 18.4-22.8 21.4l4.6-11.2L12 36.5Z" fill="#f5f2e9" />
-  <path d="m36.7 24.3 9.4-1.1-6.8 4.4 5.2 2.4-7.7-.1c-2.5 5.8-6.3 10.1-11.7 13 3.3-5.4 5.5-11.8 6.5-19.1l5.1.5Z" fill="#76c6d5" />
-  <circle cx="34.5" cy="21.4" r="1.55" fill="#182b39" />
+  <defs>
+    <linearGradient id="wing" x1="12" y1="50" x2="51" y2="12" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e9f6f5" />
+      <stop offset="1" stop-color="#8ed5dc" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="19" fill="#142536" />
+  <path d="M11 46.5 27.7 14c.9-1.8 3.2-2.3 4.8-1l19.8 15.8-16.5-2.2C31.6 39.1 22.8 47.3 11 51c3.1-1.1 5.3-2.7 7.1-4.5H11Z" fill="url(#wing)" />
+  <path d="m31.4 31.4 15.4 2.1-8.2 5.2 8.8 4.3-14.8-.9c-3.6 5.2-8.4 8.8-14.4 10.7 7.4-5.8 11.8-12.8 13.2-21.4Z" fill="#67bdca" />
+  <path d="m31.7 18.8 8.2 6.5-8.9-1.1-3.8 7.4 1.7-12.5c.2-1.2 1.8-1.5 2.8-.3Z" fill="#142536" />
+  <circle cx="34.1" cy="23.4" r="1.35" fill="#142536" />
 </svg>

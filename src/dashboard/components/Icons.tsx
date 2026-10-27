@@ -1,6 +1,10 @@
 import { useState, type ReactNode } from 'react';
 import { createAvatar } from '@dicebear/core';
 import * as lorelei from '@dicebear/lorelei';
+import {
+  siAndroid, siArc, siBrave, siFirefoxbrowser, siGooglechrome, siIos, siLinux,
+  siMacos, siOpera, siSafari, siVivaldi,
+} from 'simple-icons';
 import { domainForSource } from '../../shared/sources';
 import { Icon } from './NavIcons';
 
@@ -80,58 +84,41 @@ export function ChannelIcon({ channel }: { channel: string | null }) {
   );
 }
 
-const BROWSER_DOMAINS: Record<string, string> = {
-  Chrome: 'google.com/chrome',
-  'Chrome WebView': 'android.com',
-  Safari: 'apple.com/safari',
-  'Mobile Safari': 'apple.com/safari',
-  Firefox: 'firefox.com',
-  Edge: 'microsoft.com/edge',
-  Opera: 'opera.com',
-  'Samsung Internet': 'samsung.com',
-  Brave: 'brave.com',
-  Arc: 'arc.net',
-  Vivaldi: 'vivaldi.com',
-  Yandex: 'browser.yandex.com',
-  DuckDuckGo: 'duckduckgo.com',
-  Instagram: 'instagram.com',
-  Facebook: 'facebook.com',
-  Twitter: 'x.com',
-  LinkedIn: 'linkedin.com',
-  Threads: 'threads.net',
-  TikTok: 'tiktok.com',
-  WebKit: 'webkit.org',
-};
-const OS_DOMAINS: Record<string, string> = {
-  'Mac OS': 'apple.com',
-  iOS: 'apple.com',
-  iPadOS: 'apple.com',
-  Windows: 'microsoft.com',
-  Android: 'android.com',
-  Linux: 'kernel.org',
-  'Chrome OS': 'chromeos.google',
-};
-
 export function BrowserIcon({ name, size }: { name: string | null; size?: number }) {
-  const brand = name ? BROWSER_BRANDS[name] : null;
-  return brand ? <SourceBrandIcon slug={brand.slug} color={brand.color} source={name!} size={size ?? 18} /> : <Favicon domain={name ? BROWSER_DOMAINS[name] : null} size={size} fallback={<Icon name="browser" size={size ?? 18} />} />;
+  const brand = name ? LOCAL_BROWSER_ICONS[name] : null;
+  return brand ? <LocalBrandIcon icon={brand} size={size ?? 18} /> : <Favicon size={size} fallback={<Icon name="browser" size={size ?? 18} />} />;
 }
 
 export function OSIcon({ name, size }: { name: string | null; size?: number }) {
-  const brand = name ? OS_BRANDS[name] : null;
-  return brand ? <SourceBrandIcon slug={brand.slug} color={brand.color} source={name!} size={size ?? 18} /> : <Favicon domain={name ? OS_DOMAINS[name] : null} size={size} fallback={<Icon name="cpu" size={size ?? 18} />} />;
+  if (name === 'Windows') return <WindowsMark size={size ?? 18} />;
+  const brand = name ? LOCAL_OS_ICONS[name] : null;
+  return brand ? <LocalBrandIcon icon={brand} size={size ?? 18} /> : <Favicon size={size} fallback={<Icon name="cpu" size={size ?? 18} />} />;
 }
 
-const BROWSER_BRANDS: Record<string, { slug: string; color: string }> = {
-  Chrome: { slug: 'googlechrome', color: '4285f4' }, Firefox: { slug: 'firefox', color: 'ff7139' }, Edge: { slug: 'microsoftedge', color: '0c8ce9' },
-  Opera: { slug: 'opera', color: 'ff1b2d' }, Brave: { slug: 'brave', color: 'fb542b' }, Safari: { slug: 'safari', color: '006cff' },
-  'Mobile Safari': { slug: 'safari', color: '006cff' }, 'Chrome WebView': { slug: 'googlechrome', color: '4285f4' },
-  'Samsung Internet': { slug: 'samsunginternet', color: '1428a0' }, Arc: { slug: 'arc', color: 'fc4f5b' }, Vivaldi: { slug: 'vivaldi', color: 'ef3939' },
+function WindowsMark({ size }: { size: number }) {
+  return <svg viewBox="0 0 24 24" width={size} height={size} className="shrink-0" aria-hidden="true">
+    <path fill="#f35325" d="M2 4.8 10.7 3.6v8H2z" />
+    <path fill="#81bc06" d="m12 3.4 10-1.4v9.6H12z" />
+    <path fill="#05a6f0" d="M2 13h8.7v8L2 19.8z" />
+    <path fill="#ffba08" d="M12 13h10v9.5l-10-1.4z" />
+  </svg>;
+}
+
+type LocalBrand = { path: string; hex: string; title: string };
+const LOCAL_BROWSER_ICONS: Record<string, LocalBrand> = {
+  Chrome: siGooglechrome, 'Chrome WebView': siGooglechrome, Firefox: siFirefoxbrowser,
+  'Mobile Safari': siSafari, Safari: siSafari, Opera: siOpera, Brave: siBrave,
+  Arc: siArc, Vivaldi: siVivaldi,
 };
-const OS_BRANDS: Record<string, { slug: string; color: string }> = {
-  'Mac OS': { slug: 'macos', color: '111111' }, iOS: { slug: 'ios', color: '111111' }, iPadOS: { slug: 'ipados', color: '111111' },
-  Windows: { slug: 'windows11', color: '0078d4' }, Android: { slug: 'android', color: '3ddc84' }, Linux: { slug: 'linux', color: 'fcc624' },
+const LOCAL_OS_ICONS: Record<string, LocalBrand> = {
+  'Mac OS': siMacos, iOS: siIos, iPadOS: siIos, Android: siAndroid, Linux: siLinux,
 };
+
+function LocalBrandIcon({ icon, size }: { icon: LocalBrand; size: number }) {
+  return <svg viewBox="0 0 24 24" width={size} height={size} className="shrink-0" role="img" aria-label={icon.title}>
+    <path fill={`#${icon.hex}`} d={icon.path} />
+  </svg>;
+}
 
 const DEVICE_ICON: Record<string, string> = { Mobile: 'smartphone', Tablet: 'tablet', Desktop: 'monitor' };
 

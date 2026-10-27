@@ -74,16 +74,23 @@ export function OverviewCard({ data }: { data: Overview | null }) {
         <div className="h-[260px] w-full sm:h-[300px]">
           {data && series.length > 0 && (
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={series} margin={{ top: 8, right: 0, left: -12, bottom: 0 }}>
-                <CartesianGrid vertical={false} stroke="#e7e5e4" strokeDasharray="3 5" />
+              <ComposedChart data={series} margin={{ top: 14, right: 8, left: -12, bottom: 2 }}>
+                <defs>
+                  <linearGradient id="overview-visitors-area" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.28} />
+                    <stop offset="72%" stopColor="#93c5fd" stopOpacity={0.11} />
+                    <stop offset="100%" stopColor="#dbeafe" stopOpacity={0.015} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} stroke="#ebeef2" strokeDasharray="2 5" />
                 <XAxis
                   dataKey="bucket"
                   tickFormatter={(bucket) => bucketLabel(bucket, granularity)}
                   axisLine={false}
                   tickLine={false}
                   minTickGap={28}
-                  tick={{ fill: '#a8a29e', fontSize: 10 }}
-                  dy={8}
+                  tick={{ fill: '#8b95a3', fontSize: 10 }}
+                  dy={10}
                 />
                 <YAxis
                   yAxisId="visitors"
@@ -92,7 +99,7 @@ export function OverviewCard({ data }: { data: Overview | null }) {
                   width={42}
                   allowDecimals={false}
                   tickFormatter={fmtNumber}
-                  tick={{ fill: '#a8a29e', fontSize: 10 }}
+                  tick={{ fill: '#8b95a3', fontSize: 10 }}
                 />
                 <YAxis
                   yAxisId="revenue"
@@ -101,11 +108,11 @@ export function OverviewCard({ data }: { data: Overview | null }) {
                   tickLine={false}
                   width={48}
                   tickFormatter={(value) => fmtMoney(value, data.currency, data.decimals, true)}
-                  tick={{ fill: '#a8a29e', fontSize: 10 }}
+                  tick={{ fill: '#8b95a3', fontSize: 10 }}
                   domain={[0, (max: number) => Math.max(1, Math.ceil(max * 1.5))]}
                 />
                 <Tooltip
-                  cursor={{ fill: '#f8fafc' }}
+                  cursor={{ stroke: '#cbd5e1', strokeDasharray: '3 4', fill: 'transparent' }}
                   content={({ active, payload }) => {
                     if (!active || !payload?.length) return null;
                     const point = payload[0].payload as Series;
@@ -158,8 +165,8 @@ export function OverviewCard({ data }: { data: Overview | null }) {
                   dataKey="visitors"
                   stroke="#79b8e8"
                   strokeWidth={2.5}
-                  fill="#bfdbfe"
-                  fillOpacity={0.34}
+                  fill="url(#overview-visitors-area)"
+                  fillOpacity={1}
                   dot={false}
                   activeDot={{ r: 4, fill: '#79b8e8', stroke: '#fff', strokeWidth: 2 }}
                   isAnimationActive={false}

@@ -5,7 +5,6 @@ import { useDash } from '../lib/context';
 import { bucketLabel, fmtNumber, fmtPct } from '../lib/format';
 import { useApi } from '../lib/useApi';
 import { Favicon } from './Icons';
-import { Icon } from './NavIcons';
 
 /**
  * Which assistant sent the visit. Gartner-style "AI visibility" tabs (answers / indexing / training)
@@ -25,9 +24,6 @@ export function AiPanel() {
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-stone-100 px-5 py-3.5">
         <div>
           <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-violet-50 text-violet-600">
-              <Icon name="sparkles" size={14} />
-            </span>
             <h2 className="text-[15px] font-semibold">AI assistants</h2>
             <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-600">
               {fmtNumber(data?.total ?? 0)}
