@@ -148,7 +148,7 @@ export function OverviewCard({ data }: { data: Overview | null }) {
                   }}
                 />
                 {(notes ?? []).map((note) => series.some((point) => point.bucket === note.bucket) ? (
-                  <ReferenceLine key={note.id} x={note.bucket} stroke="#e87979" strokeDasharray="4 4"
+                  <ReferenceLine key={note.id} x={note.bucket} yAxisId="visitors" stroke="#e87979" strokeDasharray="4 4"
                     label={{ value: note.label, position: 'insideTop', fill: '#9f4b4b', fontSize: 10 }} />
                 ) : null)}
                 <Bar yAxisId="revenue" dataKey="revenue" fill="#ee8b70" radius={[3, 3, 0, 0]} maxBarSize={26} isAnimationActive={false} />
